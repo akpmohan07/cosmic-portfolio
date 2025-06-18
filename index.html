@@ -741,6 +741,60 @@
                 height: 150px;
             }
         }
+
+        .github-badge {
+    position: fixed !important;
+    top: 80px !important;
+    right: 20px !important;
+    z-index: 9999 !important;
+    opacity: 0.8 !important;
+    transition: all 0.3s ease !important;
+}
+
+.github-badge:hover {
+    opacity: 1 !important;
+    transform: scale(1.05) !important;
+}
+
+.github-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    backdrop-filter: blur(15px) !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    padding: 10px 15px !important;
+    border-radius: 25px !important;
+    border: 2px solid rgba(0, 210, 255, 0.4) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 20px rgba(0, 210, 255, 0.2) !important;
+}
+
+.github-link:hover {
+    background: rgba(0, 210, 255, 0.1) !important;
+    border-color: #00d2ff !important;
+    color: #00d2ff !important;
+    box-shadow: 0 8px 25px rgba(0, 210, 255, 0.4) !important;
+}
+
+@media (max-width: 768px) {
+    .github-link span {
+        display: none !important;
+    }
+    
+    .github-link {
+        padding: 8px !important;
+        width: 40px !important;
+        height: 40px !important;
+        justify-content: center !important;
+    }
+}
+
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -770,6 +824,8 @@
     <!-- Main Construction Container -->
     <div class="construction-container">
         <h1 class="cosmic-logo">MOHANVERSE</h1>
+
+        <iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/2LqMM3RDo4bUpbKkhDdKeC?utm_source=generator&theme=0" width="20%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
         
         <div class="construction-message">
             🌌 Universe Under Construction 🚀
@@ -796,13 +852,6 @@
         </div>
     </div>
 
-    <!-- Audio Controls -->
-    <div class="audio-controls">
-        <button class="audio-toggle" id="audioToggle" title="Play ambient space music">
-            <i class="fas fa-volume-up" id="audioIcon"></i>
-        </button>
-    </div>
-
     <!-- Launch Information -->
     <div class="launch-info">
         <h3>🚀 Coming Soon</h3>
@@ -825,10 +874,14 @@
         </a>
     </div>
 
-    <!-- Ambient Audio -->
-    <audio id="ambientAudio" loop>
-        <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
-    </audio>
+            <!-- Add this right before your closing </body> tag -->
+    <div class="github-badge">
+        <a href="https://github.com/akpmohan07/cosmic-portfolio" target="_blank" class="github-link">
+            <i class="fab fa-github"></i>
+            <span>⭐ Star on GitHub</span>
+        </a>
+    </div>
+    
 
     <script>
         // ============================================================================
