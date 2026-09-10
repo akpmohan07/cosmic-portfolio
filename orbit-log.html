@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Log</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080b14;
+    --line: rgba(63, 208, 255, 0.20);
+    --accent: #3fd0ff;
+    --label: #66788f;
+    --value: #e8eef7;
+    --dim: #586a83;
+    --ph: #47536c;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    background: var(--bg);
+    color: var(--value);
+    font-size: 13.5px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 14px;
+  }
+
+  .panel {
+    position: relative;
+    min-height: calc(100% - 28px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 15px 18px 16px;
+    overflow: hidden;
+    background:
+      radial-gradient(1100px 300px at 108% -30%, rgba(63,208,255,0.14), transparent),
+      radial-gradient(900px 260px at -15% 130%, rgba(126,224,168,0.08), transparent),
+      var(--bg);
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,0.9), transparent),
+      radial-gradient(1px 1px at 24% 62%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1.4px 1.4px at 38% 30%, rgba(255,255,255,0.8), transparent),
+      radial-gradient(1px 1px at 47% 84%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 56% 12%, rgba(255,255,255,0.65), transparent),
+      radial-gradient(1.3px 1.3px at 63% 52%, rgba(180,230,255,0.85), transparent),
+      radial-gradient(1px 1px at 71% 78%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.1px 1.1px at 79% 26%, rgba(255,255,255,0.75), transparent),
+      radial-gradient(1px 1px at 86% 60%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1.4px 1.4px at 92% 88%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 5% 90%, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1px 1px at 33% 6%, rgba(255,255,255,0.5), transparent);
+  }
+
+  .panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.015) 0 1px,
+      transparent 1px 3px
+    );
+  }
+
+  .panel > * { position: relative; z-index: 1; }
+
+  .hdr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    padding-bottom: 9px;
+    margin-bottom: 11px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hdr .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .hdr .dot { animation: none; } }
+
+  .row {
+    display: flex;
+    gap: 12px;
+    padding: 2.5px 0;
+    align-items: baseline;
+  }
+
+  .k {
+    flex: 0 0 96px;
+    color: var(--label);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.09em;
+    white-space: nowrap;
+  }
+
+  .v { min-width: 0; overflow-wrap: anywhere; }
+  .v .dim { color: var(--dim); }
+  .v.ph { color: var(--ph); font-style: italic; }
+
+  @media (max-width: 430px) {
+    body { font-size: 12px; padding: 12px; }
+    .panel { padding: 13px 14px 14px; }
+    .row { gap: 9px; padding: 2px 0; }
+    .k { flex: 0 0 70px; font-size: 8.5px; letter-spacing: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="hdr"><span class="dot"></span><span>&#128752;&#65039; ORBIT LOG</span></div>
+    <div class="row"><span class="k">Universal Log</span><span class="v" id="ul">&mdash;</span></div>
+    <div class="row"><span class="k">Callsign</span><span class="v" id="callsign">Momo</span></div>
+    <div class="row"><span class="k">Orbit</span><span class="v" id="orbit">&mdash;</span></div>
+    <div class="row"><span class="k">Position</span><span class="v" id="pos">&mdash;</span></div>
+    <div class="row"><span class="k">MET</span><span class="v" id="met">&mdash;</span></div>
+    <div class="row"><span class="k">Weather</span><span class="v" id="weather">&mdash;</span></div>
+    <div class="row"><span class="k">Status</span><span class="v" id="status">&mdash;</span></div>
+    <div class="row"><span class="k">Objective</span><span class="v" id="objective">&mdash;</span></div>
+  </div>
+
+<script>
+  var q = new URLSearchParams(location.search);
+
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fill(id, raw, placeholder, suffix) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (raw === null || raw === "") {
+      if (placeholder) { el.textContent = "[" + placeholder + "]"; el.classList.add("ph"); }
+      else { el.innerHTML = "&mdash;"; }
+      return;
+    }
+    el.innerHTML = esc(raw) + (suffix || "");
+  }
+
+  // Orbit presets: key -> emoji, display name, accent colour
+  var ORBITS = {
+    terraform:    { emoji: "🌱", label: "Terraform",    color: "#7ee0a8" },
+    lifesupport:  { emoji: "🫀", label: "Life Support", color: "#ff8fa3" }
+  };
+
+  fill("ul", q.get("ul"), "log #");
+  if (q.get("callsign")) fill("callsign", q.get("callsign"));
+
+  // Orbit / Entry / Day — combined line
+  var okey = (q.get("orbit") || "").toLowerCase().replace(/[^a-z]/g, "");
+  var preset = ORBITS[okey];
+  var entry = q.get("entry");
+  var day = q.get("day");
+
+  if (preset || q.get("orbit") || entry || day) {
+    var parts = [];
+    if (preset) {
+      parts.push('<span style="color:' + preset.color + '">' + preset.emoji + " " + preset.label + "</span>");
+    } else if (q.get("orbit")) {
+      parts.push(esc(q.get("orbit")));
+    }
+    if (entry) parts.push("Entry " + esc(entry));
+    if (day) parts.push("Orbit Day " + esc(day));
+    document.getElementById("orbit").innerHTML = parts.join(' <span class="dim">&middot;</span> ');
+  } else {
+    fill("orbit", "", "orbit · entry · day");
+  }
+
+  fill("pos", q.get("pos"), "coordinates");
+  fill("met", q.get("met"), "days", ' <span class="dim">(since birth)</span>');
+  fill("weather", q.get("weather"), "one line");
+  fill("status", q.get("status"), "one line");
+  fill("objective", q.get("objective"), "what this entry documents");
+</script>
+</body>
+</html>
