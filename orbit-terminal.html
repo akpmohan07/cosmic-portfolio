@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Log</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bright: #5bff9d;
+    --mid: #2ee27a;
+    --dim: #148a4a;
+    --faint: #0c3a24;
+    --bg: #030805;
+    --glow: rgba(46, 226, 122, 0.30);
+    --scan: rgba(0, 0, 0, 0.30);
+  }
+
+  body.amber {
+    --bright: #ffd27a;
+    --mid: #ffab2e;
+    --dim: #a06810;
+    --faint: #3a2708;
+    --bg: #080602;
+    --glow: rgba(255, 171, 46, 0.28);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "DejaVu Sans Mono", "Courier New", ui-monospace, SFMono-Regular, monospace;
+    background: #000;
+    color: var(--mid);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px;
+  }
+
+  .panel {
+    position: relative;
+    min-height: calc(100% - 24px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--bg);
+    border: 1px solid var(--dim);
+    padding: 24px 22px 20px;
+    overflow: hidden;
+    box-shadow: inset 0 0 70px rgba(0,0,0,0.85), inset 0 0 22px var(--glow);
+  }
+
+  /* corner brackets */
+  .panel::before, .panel::after,
+  .brk::before, .brk::after {
+    content: "";
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    border: 0 solid var(--bright);
+    z-index: 3;
+  }
+  .panel::before { top: 6px; left: 6px; border-top-width: 2px; border-left-width: 2px; }
+  .panel::after  { top: 6px; right: 6px; border-top-width: 2px; border-right-width: 2px; }
+  .brk::before   { bottom: 6px; left: 6px; border-bottom-width: 2px; border-left-width: 2px; }
+  .brk::after    { bottom: 6px; right: 6px; border-bottom-width: 2px; border-right-width: 2px; }
+
+  .crt {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: repeating-linear-gradient(to bottom, var(--scan) 0 1px, transparent 1px 3px);
+    mix-blend-mode: multiply;
+  }
+  .crt::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(125% 125% at 50% 0%, transparent 52%, rgba(0,0,0,0.6) 100%);
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 3px var(--glow);
+  }
+
+  .hdr {
+    color: var(--bright);
+    letter-spacing: 0.2em;
+    font-weight: 700;
+    font-size: 11px;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--faint);
+  }
+
+  .row { display: flex; gap: 10px; padding: 2px 0; align-items: baseline; }
+
+  .k {
+    flex: 0 0 118px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .k::before { content: "> "; color: var(--faint); }
+
+  .v { color: var(--bright); min-width: 0; overflow-wrap: anywhere; }
+  .v .d { color: var(--dim); }
+  .v.ph { color: var(--dim); opacity: 0.65; }
+
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    background: var(--bright);
+    margin-left: 3px;
+    transform: translateY(1px);
+    box-shadow: 0 0 6px var(--glow);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+
+  @media (max-width: 430px) {
+    body { font-size: 12px; padding: 10px; }
+    .panel { padding: 22px 15px 16px; }
+    .k { flex-basis: 96px; letter-spacing: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="panel brk">
+    <div class="crt"></div>
+    <div class="content">
+      <div class="hdr">// ORBIT LOG</div>
+      <div class="row"><span class="k">Universal Log</span><span class="v" id="ul">&mdash;</span></div>
+      <div class="row"><span class="k">Callsign</span><span class="v" id="callsign">Momo</span></div>
+      <div class="row"><span class="k">Orbit</span><span class="v" id="orbit">&mdash;</span></div>
+      <div class="row"><span class="k">Position</span><span class="v" id="pos">&mdash;</span></div>
+      <div class="row"><span class="k">MET</span><span class="v" id="met">&mdash;</span></div>
+      <div class="row"><span class="k">Weather</span><span class="v" id="weather">&mdash;</span></div>
+      <div class="row"><span class="k">Status</span><span class="v" id="status">&mdash;</span></div>
+      <div class="row"><span class="k">Objective</span><span class="v" id="objective">&mdash;</span><span class="cursor"></span></div>
+    </div>
+  </div>
+
+<script>
+  var q = new URLSearchParams(location.search);
+
+  if ((q.get("theme") || "").toLowerCase() === "amber") document.body.classList.add("amber");
+
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fill(id, raw, placeholder, suffix) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (raw === null || raw === "") {
+      if (placeholder) { el.textContent = "[" + placeholder + "]"; el.classList.add("ph"); }
+      else { el.innerHTML = "&mdash;"; }
+      return;
+    }
+    el.innerHTML = esc(raw) + (suffix || "");
+  }
+
+  var ORBITS = {
+    terraform:   { emoji: "🌱", label: "Terraform" },
+    lifesupport: { emoji: "🫀", label: "Life Support" }
+  };
+
+  fill("ul", q.get("ul"), "log #");
+  if (q.get("callsign")) fill("callsign", q.get("callsign"));
+
+  var okey = (q.get("orbit") || "").toLowerCase().replace(/[^a-z]/g, "");
+  var preset = ORBITS[okey];
+  var entry = q.get("entry");
+  var day = q.get("day");
+
+  if (preset || q.get("orbit") || entry || day) {
+    var parts = [];
+    if (preset) parts.push(preset.emoji + " " + preset.label);
+    else if (q.get("orbit")) parts.push(esc(q.get("orbit")));
+    if (entry) parts.push("Entry " + esc(entry));
+    if (day) parts.push("Orbit Day " + esc(day));
+    document.getElementById("orbit").innerHTML = parts.join(' <span class="d">&middot;</span> ');
+  } else {
+    fill("orbit", "", "orbit · entry · day");
+  }
+
+  fill("pos", q.get("pos"), "coordinates");
+  fill("met", q.get("met"), "days", ' <span class="d">(since birth)</span>');
+  fill("weather", q.get("weather"), "one line");
+  fill("status", q.get("status"), "one line");
+  fill("objective", q.get("objective"), "what this entry documents");
+</script>
+</body>
+</html>
