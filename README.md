@@ -11,9 +11,7 @@ blogs/                pages embedded in, or linked from, posts on blogs.mohanver
   downlink.html       log card rendered from an OLP-1 packet (?p=<hex>)
   encode.html         builds packets and the iframe code for a post
   map.html            globe that flies to a log's place and moment
-  log.html            classic log card (query-string fields)
-  terminal.html       classic card, retro terminal style
-  shared/orbits.js    the orbit list: code, name, emoji, colour
+  shared/orbits.js    the orbit list: code, name, emoji
   shared/olp.js       OLP-1 encode / decode / CRC
 docs/olp-1.md         the packet format
 ```

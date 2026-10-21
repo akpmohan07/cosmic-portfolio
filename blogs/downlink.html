@@ -25,7 +25,7 @@
     background: #000;
     color: var(--g);
     font-family: "VT323", ui-monospace, Menlo, monospace;
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1.3;
     letter-spacing: 0.02em;
     padding: 10px;
@@ -68,7 +68,8 @@
   .v a { color: inherit; text-decoration: underline dotted var(--gd); text-underline-offset: 3px; }
   .v a:hover { text-decoration-color: var(--g); }
 
-  .copyrow { margin-top: 6px; }
+  .copy { margin-left: 10px; }
+  .wxk { color: var(--gd); }
   .emo { font-size: 0.68em; vertical-align: 0.08em; text-shadow: none; }   /* emoji draw much larger than the pixel font */
   .copy {
     background: none;
@@ -96,7 +97,7 @@
   @keyframes blink { 50% { opacity: 0; } }
 
   @media (max-width: 480px) {
-    body { font-size: 19px; padding: 8px; }
+    body { font-size: 18px; padding: 8px; }
     .crt { padding: 12px 12px 12px 12px; }
     .row .k { flex-basis: 44px; }
     .hex { display: none; }
@@ -187,18 +188,17 @@
     var ll = Math.abs(p.lat).toFixed(2) + (p.lat >= 0 ? "N" : "S") + " " +
              pad(Math.abs(p.lon).toFixed(2), 6) + (p.lon >= 0 ? "E" : "W");
 
+    // Header: log, orbit + entry, local time and date
     var head = line("d");
-    head.append(">> DOWNLINK  PKT " + pad(p.log, 3) + "  //  CH ");
+    head.append(">> PKT " + pad(p.log, 3) + " · ");
     if (p.emoji) {
       var emo = document.createElement("span");
       emo.className = "emo";
       emo.textContent = p.emoji;
       head.append(emo, " ");
     }
-    head.append(p.orbitName + "  //  SEQ " + pad(p.entry, 3) + "  //  RX " + time + " " + zone);
-    text("f hex", hex(p.bytes.slice(0, 20)) + "  +" + (p.bytes.length - 22) + " B  ·  CRC " +
-      hex(p.bytes.slice(-2)).replace(" ", "") + " OK");
-    line("gap");
+    head.append(p.orbitName + " " + pad(p.entry, 3) + " · " + time + " " + zone + " · " + date);
+
     // FROM: the coordinates open the orbit map at this spot and moment
     var from = row("From", p.callsign + " @ ");
     var map = document.createElement("a");
@@ -211,18 +211,30 @@
     map.rel = "noopener";
     map.textContent = ll + " ↗";
     from.append(map, p.text.place ? " · " + p.text.place : "");
-    row("MET", "Day " + Math.floor(p.met / 86400) + " · " + date);
-    var wx = row("WX", p.text.weather || "…");
+
+    // MET and weather share a row; the WX part disappears if the lookup fails
+    var met = row("MET", "Day " + Math.floor(p.met / 86400));
+    var wxPart = document.createElement("span");
+    var wxKey = document.createElement("span");
+    wxKey.className = "wxk";
+    wxKey.textContent = "  ·  WX ";
+    var wx = document.createElement("span");
+    wx.textContent = p.text.weather || "…";
+    wxPart.append(wxKey, wx);
+    met.appendChild(wxPart);
     if (!p.text.weather) fetchWeather(p, wx);
+
     if (p.text.status) row("Stat", p.text.status);
     if (p.text.objective) row("Obj", p.text.objective);
-    text("d", ">> END OF PACKET");
+
+    var end = line("d");
+    end.textContent = ">> END OF PACKET";
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "copy";
     btn.textContent = "[ Copy packet ]";
     btn.addEventListener("click", function () { copyPacket(hex(p.bytes).replace(/ /g, ""), btn); });
-    line("copyrow").appendChild(btn);
+    end.appendChild(btn);
     var prompt = line("d");                                                   // fresh prompt: the cursor always sits at the very end
     prompt.textContent = ">> ";
     prompt.insertAdjacentHTML("beforeend", '<span class="cur"></span>');

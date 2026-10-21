@@ -71,7 +71,7 @@
   .note.bad, .bad { color: var(--bad); }
   [hidden] { display: none !important; }
 
-  .preview { border: 0; width: 100%; height: 430px; display: block; background: #000; }
+  .preview { border: 0; width: 100%; height: clamp(250px, calc(600px - 45vw), 360px); display: block; background: #000; }
 
   .hex {
     font-family: var(--mono);
@@ -352,7 +352,7 @@
   }
 
   function iframeCode(hex) {
-    return '<iframe src="' + CARD_URL + '?p=' + hex + '" allow="clipboard-write" style="width:100%;height:430px;border:0"></iframe>';
+    return '<iframe src="' + CARD_URL + '?p=' + hex + '" allow="clipboard-write" style="width:100%;height:clamp(250px, calc(600px - 45vw), 360px);border:0"></iframe>';
   }
 
   var current = null, previewTimer = null;
