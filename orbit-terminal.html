@@ -110,6 +110,7 @@
   .v { color: var(--bright); min-width: 0; overflow-wrap: anywhere; }
   .v .d { color: var(--dim); }
   .v.ph { color: var(--dim); opacity: 0.65; }
+  .v a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 
   .cursor {
     display: inline-block;
@@ -171,7 +172,12 @@
 
   var ORBITS = {
     terraform:   { emoji: "🌱", label: "Terraform" },
-    lifesupport: { emoji: "🫀", label: "Life Support" }
+    lifesupport: { emoji: "🫀", label: "Life Support" },
+    rations:     { emoji: "🥫", label: "Rations" },
+    expeditions: { emoji: "🗺️", label: "Expeditions" },
+    offduty:     { emoji: "🎶", label: "Off-Duty" },
+    engineering: { emoji: "🔧", label: "Engineering" },
+    navigation:  { emoji: "🧭", label: "Navigation" }
   };
 
   fill("ul", q.get("ul"), "log #");
@@ -194,7 +200,28 @@
   }
 
   fill("pos", q.get("pos"), "coordinates");
-  fill("met", q.get("met"), "days", ' <span class="d">(since birth)</span>');
+
+  // Position links to Google Earth when lat/lon are given (numbers only, so nothing else can be injected)
+  var lat = parseFloat(q.get("lat")), lon = parseFloat(q.get("lon"));
+  if (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    var posEl = document.getElementById("pos");
+    var label = q.get("pos") || lat.toFixed(2) + ", " + lon.toFixed(2);
+    posEl.classList.remove("ph");
+    posEl.innerHTML = '<a href="https://earth.google.com/web/search/' + lat + "," + lon +
+      '" target="_blank" rel="noopener">' + esc(label) + ' <span class="d">&#8599;</span></a>';
+  }
+
+  // MET: days since birth, worked out from the log date (?date=YYYY-MM-DD) so an entry stays fixed
+  // to the day it was written. An explicit ?met= still wins.
+  var BIRTH = Date.UTC(1999, 11, 28);
+  function metFrom(d) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || "");
+    if (!m) return null;
+    var days = Math.round((Date.UTC(+m[1], m[2] - 1, +m[3]) - BIRTH) / 86400000);
+    return days >= 0 ? "Day " + days.toLocaleString("en-US") : null;
+  }
+
+  fill("met", q.get("met") || metFrom(q.get("date")), "days", ' <span class="d">(since birth)</span>');
   fill("weather", q.get("weather"), "one line");
   fill("status", q.get("status"), "one line");
   fill("objective", q.get("objective"), "what this entry documents");

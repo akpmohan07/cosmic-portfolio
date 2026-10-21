@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --space: #000;
+    --text: #eef1f5;
+    --muted: #8b95a3;
+    --rule: rgba(255, 255, 255, 0.28);
+    --track: #ff3b30;
+    --label-font: "Barlow Condensed", "DIN Condensed", "Arial Narrow", sans-serif;
+    --data-font: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  html, body, #map { height: 100%; }
+
+  body {
+    background: var(--space);
+    color: var(--text);
+    font-family: var(--data-font);
+    overflow: hidden;
+  }
+
+  #stars { position: fixed; inset: 0; pointer-events: none; }
+  #map { position: relative; z-index: 1; }
+
+  /* Dark gradients at the top and bottom edges keep the readouts legible over bright imagery */
+  .scrim { position: fixed; left: 0; right: 0; z-index: 2; pointer-events: none; }
+  .scrim.top { top: 0; height: 110px; background: linear-gradient(rgba(0,0,0,0.65), transparent); }
+  .scrim.bottom { bottom: 0; height: 170px; background: linear-gradient(transparent, rgba(0,0,0,0.75)); }
+
+  .hud { position: fixed; z-index: 3; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+
+  .hud .cap {
+    font-family: var(--label-font);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Layer switches (top left) */
+  .layers { top: 14px; left: 16px; }
+  .layers .cap { margin-bottom: 6px; }
+  .layers button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: 0;
+    padding: 2px 0;
+    color: var(--muted);
+    font-family: var(--label-font);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .layers button::before { content: ""; width: 8px; height: 8px; border: 1px solid var(--muted); }
+  .layers button[aria-pressed="true"] { color: var(--text); }
+  .layers button[aria-pressed="true"]::before { background: var(--text); border-color: var(--text); }
+
+  /* Captured (bottom left) */
+  .captured { left: 16px; bottom: 16px; padding-left: 10px; border-left: 1px solid var(--rule); max-width: calc(100vw - 170px); }
+  .captured:empty { display: none; }
+  .captured .cap { margin-bottom: 4px; }
+  .captured .row { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.6; }
+  .captured .k {
+    flex: 0 0 26px;
+    font-family: var(--label-font);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  /* Telemetry (bottom right) */
+  .telemetry { right: 16px; bottom: 40px; text-align: right; }
+  .telemetry .row { display: flex; justify-content: flex-end; gap: 10px; font-size: 12px; line-height: 1.6; }
+  .telemetry .k { font-family: var(--label-font); font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding-top: 1px; }
+  .telemetry .v { min-width: 92px; font-variant-numeric: tabular-nums; }
+
+  /* Pin: lock-on reticle with a red tracking dot and a leader-line label */
+  .pin { position: relative; width: 0; height: 0; pointer-events: none; }
+
+  .reticle {
+    position: absolute;
+    left: -48px;
+    top: -48px;
+    width: 96px;
+    height: 96px;
+    opacity: 0.3;
+    transition: all 1.2s cubic-bezier(.2, .8, .2, 1);
+  }
+  .pin.landed .reticle { left: -16px; top: -16px; width: 32px; height: 32px; opacity: 1; }
+  .reticle i { position: absolute; width: 8px; height: 8px; border: 0 solid var(--text); }
+  .reticle i:nth-child(1) { left: 0; top: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+  .reticle i:nth-child(2) { right: 0; top: 0; border-top-width: 1.5px; border-right-width: 1.5px; }
+  .reticle i:nth-child(3) { left: 0; bottom: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+  .reticle i:nth-child(4) { right: 0; bottom: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+  .track {
+    position: absolute;
+    left: -3px;
+    top: -3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--track);
+    animation: blink 1.4s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  /* Label on a leader line: a diagonal from the reticle's corner, then a rule under the text */
+  .callout {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    opacity: 0;
+    transition: opacity 0.6s ease 0.9s;
+  }
+  .pin.landed .callout { opacity: 1; }
+  .callout .lead {
+    width: 22px;
+    height: 22px;
+    margin-top: 21px;
+    background: linear-gradient(to top right, transparent calc(50% - 0.6px), var(--text) 50%, transparent calc(50% + 0.6px));
+  }
+  .callout .text {
+    border-bottom: 1px solid var(--text);
+    padding: 0 2px 2px;
+    font-family: var(--label-font);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  }
+  .callout .text:empty { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .track { animation: none; }
+    .reticle, .callout { transition: none; }
+  }
+
+  @media (max-width: 480px) {
+    .captured { max-width: calc(100vw - 32px); bottom: 64px; }
+    .telemetry { bottom: 16px; left: 16px; right: auto; display: flex; gap: 16px; padding-left: 10px; }
+    .telemetry .row { gap: 6px; }
+    .telemetry .v { min-width: 0; }
+  }
+
+  /* Map controls restyled to match */
+  .maplibregl-ctrl-group { background: rgba(0,0,0,0.35); border: 1px solid var(--rule); border-radius: 0; box-shadow: none !important; }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--rule); }
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+  .maplibregl-ctrl-attrib.maplibregl-compact { background: rgba(0,0,0,0.45); color: var(--muted); }
+  .maplibregl-ctrl-attrib-button { filter: invert(1); }
+  .maplibregl-ctrl-attrib a { color: var(--text); }
+</style>
+</head>
+<body>
+  <canvas id="stars"></canvas>
+  <div id="map"></div>
+  <div class="scrim top"></div>
+  <div class="scrim bottom"></div>
+  <div class="hud layers" id="layers"><div class="cap">Layers</div></div>
+  <div class="hud captured" id="captured"></div>
+  <div class="hud telemetry" id="telemetry"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script>
+  // Orbit Map: a satellite globe that flies down to one spot, shown as it was at one moment.
+  //   ?lat=53.40&lon=-6.25      where to land (numbers only)
+  //   &label=Signal · Entry 001 text beside the reticle (optional)
+  //   &place=Dublin, Ireland    place name for the "On" line (optional)
+  //   &t=2026-10-20T14:50Z      the moment, in UTC (optional): that moment's clouds, day/night and clock
+  //   &tz=Europe/Dublin         time zone for the clock (optional, default Europe/Dublin)
+  //   &layers=off               start with labels, clouds and day/night switched off (optional)
+  var q = new URLSearchParams(location.search);
+  var rad = Math.PI / 180;
+
+  var lat = parseFloat(q.get("lat")), lon = parseFloat(q.get("lon"));
+  if (!(isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) { lat = 53.40; lon = -6.25; }
+  var layersOn = q.get("layers") !== "off";
+
+  var moment = null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(q.get("t") || "")) {
+    moment = new Date(q.get("t"));
+    if (isNaN(moment)) moment = null;
+  }
+
+  // ---- Starfield: sparse, faint, mostly tiny, like a real long-exposure sky ----
+  (function () {
+    var c = document.getElementById("stars");
+    function draw() {
+      var dpr = window.devicePixelRatio || 1;
+      c.width = innerWidth * dpr;
+      c.height = innerHeight * dpr;
+      c.style.width = innerWidth + "px";
+      c.style.height = innerHeight + "px";
+      var g = c.getContext("2d"), seed = 7;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      var n = Math.round(innerWidth * innerHeight / 2600);
+      for (var i = 0; i < n; i++) {
+        var r = rnd() < 0.93 ? 0.5 : rnd() < 0.8 ? 0.9 : 1.3;
+        g.globalAlpha = 0.25 + rnd() * 0.6;
+        g.fillStyle = rnd() < 0.15 ? "#cfe0ff" : rnd() < 0.08 ? "#ffe6c7" : "#fff";
+        g.beginPath();
+        g.arc(rnd() * c.width, rnd() * c.height, r * dpr, 0, 6.283);
+        g.fill();
+      }
+    }
+    draw();
+    addEventListener("resize", draw);
+  })();
+
+  // ---- Sun (low-precision solar formulas, good to a fraction of a degree) ----
+  function sunAt(date) {
+    var n = date.getTime() / 86400000 + 2440587.5 - 2451545.0;            // days since J2000
+    var L = (280.460 + 0.9856474 * n) % 360;
+    var g = ((357.528 + 0.9856003 * n) % 360) * rad;
+    var lambda = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+    var eps = (23.439 - 0.0000004 * n) * rad;
+    var ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)) / rad;
+    var dec = Math.asin(Math.sin(eps) * Math.sin(lambda)) / rad;
+    var gmst = (18.697374558 + 24.06570982441908 * n) % 24;
+    return { lat: dec, lon: ((ra - gmst * 15) % 360 + 540) % 360 - 180 };  // where the sun is overhead
+  }
+
+  function sunAltitude(sun, la, lo) {
+    return Math.asin(Math.sin(la * rad) * Math.sin(sun.lat * rad) +
+      Math.cos(la * rad) * Math.cos(sun.lat * rad) * Math.cos((lo - sun.lon) * rad)) / rad;
+  }
+
+  // Polygon covering the night side of the Earth
+  function nightPolygon(sun) {
+    var ring = [], dec = Math.abs(sun.lat) < 0.01 ? 0.01 : sun.lat;
+    for (var x = -180; x <= 180; x += 2) {
+      ring.push([x, Math.atan(-Math.cos((x - sun.lon) * rad) / Math.tan(dec * rad)) / rad]);
+    }
+    var pole = dec > 0 ? -85.05 : 85.05;                                     // the dark pole (map edge)
+    ring.push([180, pole], [-180, pole], ring[0]);
+    return { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] } };
+  }
+
+  // Meteosat publishes a new image every 10 minutes: use the slot the moment falls in
+  function meteosatSlot(date) {
+    return new Date(Math.floor(date.getTime() / 600000) * 600000).toISOString().slice(0, 16) + ":00Z";
+  }
+
+  // Landing zoom: the camera stops at this altitude above the pin (readers can zoom in further).
+  // Same geometry as the ALT readout, so the readout shows exactly this on landing.
+  var LANDING_ALT_KM = 1;
+  function landingZoom() {
+    var h = document.getElementById("map").clientHeight || 600;
+    var distPx = 0.5 * h / Math.tan(36.87 * rad / 2);                      // MapLibre's default camera field of view
+    return Math.log2(78271.517 * Math.cos(lat * rad) * distPx / (LANDING_ALT_KM * 1000));
+  }
+
+  var sun = moment ? sunAt(moment) : null;
+
+  // The flight starts above the point where the sun was overhead at that moment
+  // (without a moment: from the far side of the Earth)
+  var startView = sun ? { center: [sun.lon, sun.lat], zoom: 0.8 } : { center: [lon + 150, lat * 0.2], zoom: 0.3 };
+
+  var map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      projection: { type: "globe" },
+      sky: { "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 7, 0] },
+      sources: {
+        imagery: {
+          type: "raster",
+          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          maxzoom: 19,
+          attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+        },
+        labels: {
+          type: "raster",
+          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          maxzoom: 16,
+          attribution: "Labels &copy; Esri"
+        }
+      },
+      layers: [
+        { id: "imagery", type: "raster", source: "imagery" },
+        { id: "labels", type: "raster", source: "labels", layout: { visibility: layersOn ? "visible" : "none" } }
+      ]
+    },
+    center: startView.center,
+    zoom: startView.zoom,
+    maxZoom: 19,
+    attributionControl: { compact: true }
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+  // The moment: Meteosat clouds (colour by day, infrared by night) and the night side of the Earth
+  if (moment) {
+    map.on("load", function () {
+      var vis = layersOn ? "visible" : "none";
+      map.addSource("clouds", {
+        type: "raster",
+        tiles: ["https://view.eumetsat.int/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap" +
+          "&LAYERS=mtg_fd:rgb_geocolour&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}" +
+          "&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true&TIME=" + meteosatSlot(moment)],
+        bounds: [-80, -65, 80, 65],                                         // where Meteosat sees the Earth clearly
+        tileSize: 256,
+        attribution: "Clouds &copy; EUMETSAT"
+      });
+      map.addLayer({
+        id: "clouds", type: "raster", source: "clouds", layout: { visibility: vis },
+        paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.8, 11, 0.25] }
+      }, "labels");
+      map.addSource("night", { type: "geojson", data: nightPolygon(sun) });
+      map.addLayer({
+        id: "night", type: "fill", source: "night", layout: { visibility: vis },
+        paint: { "fill-color": "#01030a", "fill-opacity": 0.55, "fill-antialias": false }
+      }, "labels");
+    });
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function row(k, v) { var r = el("div", "row"); r.append(el("span", "k", k), el("span", "v", v)); return r; }
+
+  // ---- Captured (bottom left) ----
+  if (moment) {
+    var tz = q.get("tz") || "Europe/Dublin";
+    var fmt = function (opts) {
+      try { return new Intl.DateTimeFormat("en-IE", Object.assign({ timeZone: tz }, opts)).format(moment); }
+      catch (e) { return new Intl.DateTimeFormat("en-IE", Object.assign({ timeZone: "UTC" }, opts)).format(moment); }
+    };
+    var time = fmt({ hour: "2-digit", minute: "2-digit", hour12: false });
+    var zone = fmt({ timeZoneName: "short" }).split(" ").pop();
+    var date = fmt({ weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    var alt = sunAltitude(sun, lat, lon);
+    var place = q.get("place");
+
+    document.getElementById("captured").append(
+      el("div", "cap", "Captured"),
+      row("On", "Planet Earth" + (place ? " · " + place : "")),
+      row("At", time + " " + zone + " · " + date),
+      row("", alt > 0 ? "Daylight" : alt > -6 ? "Twilight" : "Night")
+    );
+  }
+
+  // ---- Telemetry (bottom right): live camera altitude, and the target ----
+  var altRow = row("Alt", "—");
+  document.getElementById("telemetry").append(
+    altRow,
+    row("Lat", Math.abs(lat).toFixed(2) + "° " + (lat >= 0 ? "N" : "S")),
+    row("Lon", Math.abs(lon).toFixed(2) + "° " + (lon >= 0 ? "E" : "W"))
+  );
+  var altValue = altRow.querySelector(".v");
+  function updateAltitude() {
+    var c = map.getCenter(), h = map.getContainer().clientHeight;
+    var metresPerPx = 78271.517 * Math.cos(c.lat * rad) / Math.pow(2, map.getZoom());
+    var distPx = 0.5 * h / Math.tan(36.87 * rad / 2);                       // MapLibre's default camera field of view
+    var km = metresPerPx * distPx / 1000;
+    altValue.textContent = (km >= 100 ? Math.round(km).toLocaleString("en-US") : km.toFixed(1)) + " km";
+  }
+  map.on("move", updateAltitude);
+  map.on("load", updateAltitude);
+
+  // ---- Layer switches (top left) ----
+  var panel = document.getElementById("layers");
+  function addToggle(ids, text) {
+    var b = el("button", null, text);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(layersOn));
+    b.addEventListener("click", function () {
+      var on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", String(on));
+      ids.forEach(function (id) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+      });
+    });
+    panel.appendChild(b);
+  }
+  addToggle(["labels"], "Labels");
+  if (moment) {
+    addToggle(["clouds"], "Clouds");
+    addToggle(["night"], "Day / night");
+  }
+
+  // ---- Pin: lock-on reticle, red tracking dot, leader-line label (label set via textContent) ----
+  var pin = el("div", "pin");
+  var reticle = el("div", "reticle");
+  reticle.append(el("i"), el("i"), el("i"), el("i"));
+  var callout = el("div", "callout");
+  callout.append(el("div", "lead"), el("div", "text", q.get("label") || ""));
+  pin.append(reticle, el("div", "track"), callout);
+  new maplibregl.Marker({ element: pin, anchor: "center" }).setLngLat([lon, lat]).addTo(map);
+
+  // ---- Fly in ----
+  map.on("load", function () {
+    // Start with the credits collapsed to the (i) button
+    var attrib = document.querySelector(".maplibregl-ctrl-attrib");
+    if (attrib) attrib.classList.remove("maplibregl-compact-show");
+
+    var target = { center: [lon, lat], zoom: landingZoom() };
+    function land() { pin.classList.add("landed"); }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      map.jumpTo(target);
+      land();
+      return;
+    }
+    setTimeout(function () {
+      map.flyTo(Object.assign({ duration: 7000, curve: 1.6, essential: true }, target));
+      map.once("moveend", land);
+    }, 1200);
+  });
+</script>
+</body>
+</html>

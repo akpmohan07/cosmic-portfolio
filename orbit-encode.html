@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Orbit Encoder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #020a04;
+    --panel: #04120a;
+    --g: #39ff7a;
+    --gd: #1fa04b;
+    --gf: #0f3a1d;
+    --text: #d8f5e2;
+    --bad: #ff5a4f;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --crt: "VT323", ui-monospace, monospace;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 14px; padding: 24px 16px 64px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  h1 { font-family: var(--crt); font-weight: 400; font-size: 34px; color: var(--g); text-shadow: 0 0 6px rgba(57,255,122,0.5); letter-spacing: 0.04em; }
+  .sub { color: var(--gd); margin: 2px 0 22px; }
+
+  fieldset { border: 1px solid var(--gf); padding: 14px 14px 10px; margin-bottom: 16px; background: var(--panel); }
+  legend { font-family: var(--crt); font-size: 22px; color: var(--g); padding: 0 6px; letter-spacing: 0.06em; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; }
+  .grid.two { grid-template-columns: 1fr 1fr; }
+  .full { grid-column: 1 / -1; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } .grid.two { grid-template-columns: 1fr; } }
+
+  label { display: block; color: var(--gd); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  label .n { float: right; text-transform: none; letter-spacing: 0; }
+  label .n.over { color: var(--bad); }
+
+  input, select, textarea {
+    width: 100%;
+    background: #000;
+    color: var(--text);
+    border: 1px solid var(--gf);
+    padding: 7px 8px;
+    font: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gd); box-shadow: 0 0 0 1px var(--gd); }
+  input[readonly] { color: var(--gd); }
+  textarea { resize: vertical; min-height: 54px; }
+
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .seg button, .btn {
+    background: none;
+    border: 1px solid var(--gd);
+    color: var(--g);
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--g); color: #021006; border-color: var(--g); }
+  .btn:hover, .seg button:hover { border-color: var(--g); }
+  .btn.primary { background: var(--g); color: #021006; border-color: var(--g); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .note { color: var(--gd); font-size: 12px; margin-top: 6px; }
+  .note.bad, .bad { color: var(--bad); }
+  [hidden] { display: none !important; }
+
+  .preview { border: 0; width: 100%; height: 430px; display: block; background: #000; }
+
+  .hex {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--g);
+    background: #000;
+    border: 1px solid var(--gf);
+    padding: 10px;
+    word-break: break-all;
+    line-height: 1.5;
+    max-height: 140px;
+    overflow: auto;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--gd); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&gt;&gt; ORBIT ENCODER</h1>
+  <p class="sub">Build an OLP-1 downlink packet for a log entry, preview it, and copy the iframe.</p>
+
+  <fieldset>
+    <legend>Log</legend>
+    <div class="grid">
+      <div><label for="callsign">Callsign</label><input id="callsign" value="MOMO" readonly></div>
+      <div><label for="orbit">Orbit</label><select id="orbit"></select></div>
+      <div><label for="entry">Orbit entry</label><input id="entry" type="number" min="1" max="65535" value="1"></div>
+      <div><label for="log">Universal log</label><input id="log" type="number" min="1" max="65535" value="1"></div>
+    </div>
+    <p class="note" id="counterNote"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Time</legend>
+    <div class="seg" role="group" aria-label="Time source">
+      <button type="button" data-time="now" aria-pressed="true">Now</button>
+      <button type="button" data-time="custom" aria-pressed="false">Pick a time</button>
+    </div>
+    <div class="grid two">
+      <div><label for="when">Date and time (in the zone)</label><input id="when" type="datetime-local" step="60"></div>
+      <div><label for="zone">Time zone</label><select id="zone"></select></div>
+    </div>
+    <p class="note" id="timeNote"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Location</legend>
+    <div class="seg" role="group" aria-label="Location source">
+      <button type="button" data-loc="current" aria-pressed="true">Current location</button>
+      <button type="button" data-loc="custom" aria-pressed="false">Type coordinates</button>
+      <button type="button" data-loc="saved" aria-pressed="false">Saved place</button>
+    </div>
+    <div class="grid">
+      <div><label for="lat">Latitude</label><input id="lat" type="number" step="0.01" min="-90" max="90" placeholder="53.40"></div>
+      <div><label for="lon">Longitude</label><input id="lon" type="number" step="0.01" min="-180" max="180" placeholder="-6.25"></div>
+      <div data-show="saved" hidden><label for="saved">Saved place</label><select id="saved"></select></div>
+      <div class="full"><label for="place">Place name <span class="n" data-count="place"></span></label><input id="place" placeholder="Dublin, Ireland"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="locate" data-show="current">Get current location</button>
+      <button type="button" class="btn" id="savePlace">Save as a place</button>
+      <button type="button" class="btn" id="forgetPlace" data-show="saved" hidden>Forget this place</button>
+    </div>
+    <p class="note" id="locNote">Coordinates are rounded to 2 decimals (about 1 km) in the packet.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Message</legend>
+    <div class="grid two">
+      <div class="full"><label for="status">Status <span class="n" data-count="status"></span></label><input id="status" placeholder="Signal acquired: 79 channels, zero algorithm"></div>
+      <div class="full"><label for="objective">Objective <span class="n" data-count="objective"></span></label><textarea id="objective" placeholder="Rebuild my YouTube: 788 subscriptions → a 79-channel feed"></textarea></div>
+      <div class="full"><label for="weather">Weather override (optional) <span class="n" data-count="weather"></span></label><input id="weather" placeholder="Leave empty to fetch the real weather automatically"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Preview</legend>
+    <iframe class="preview" id="preview" title="Downlink card preview"></iframe>
+  </fieldset>
+
+  <fieldset>
+    <legend>Packet</legend>
+    <div class="hex" id="hex"></div>
+    <div class="meta" id="meta"></div>
+    <p class="note bad" id="errors"></p>
+    <div class="row">
+      <button type="button" class="btn primary" id="copyIframe">Copy iframe</button>
+      <button type="button" class="btn" id="copyHex">Copy packet</button>
+      <span class="note" id="copied"></span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Load a packet</legend>
+    <label for="loadHex">Paste a packet (hex) or an iframe</label>
+    <textarea id="loadHex" placeholder="4D4F4D4F01…"></textarea>
+    <div class="row">
+      <button type="button" class="btn" id="editPacket">Edit this packet</button>
+      <button type="button" class="btn" id="continuePacket">Continue after it</button>
+    </div>
+    <p class="note" id="loadNote">Edit: fills the form to fix a typo. Continue: sets the next log and entry numbers.</p>
+  </fieldset>
+</div>
+
+<script>
+  // OLP-1 encoder. Keep these tables and the layout in sync with orbit-downlink.html.
+  var EPOCH = Date.UTC(1999, 11, 28);
+  var ORBITS = { 1: "Terraform", 2: "Life Support", 3: "Rations", 4: "Expeditions",
+                 5: "Off-Duty", 6: "Engineering", 7: "Navigation" };
+  var EMOJI = { 1: "🌱", 2: "🫀", 3: "🥫", 4: "🗺️", 5: "🎶", 6: "🔧", 7: "🧭" };
+  var ZONES = { 0: "UTC", 1: "Europe/Dublin", 2: "Asia/Kolkata", 3: "Europe/London" };
+  var TEXT = { place: 0x10, weather: 0x11, status: 0x12, objective: 0x13 };
+  var SITE = "https://mohanverse.dev/";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var utf8 = new TextEncoder();
+  var state = { time: "now", loc: "current" };
+
+  // ---- Browser storage (per-viewer conveniences: last counters, saved places) ----
+  function load(key, fallback) {
+    try { var v = localStorage.getItem("olp." + key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+  }
+  function save(key, value) { try { localStorage.setItem("olp." + key, JSON.stringify(value)); } catch (e) {} }
+
+  // ---- Setup ----
+  Object.keys(ORBITS).forEach(function (k) { $("orbit").add(new Option(EMOJI[k] + "  " + ORBITS[k], k)); });
+  Object.keys(ZONES).forEach(function (k) { $("zone").add(new Option(ZONES[k], k)); });
+
+  var deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var zoneKey = Object.keys(ZONES).find(function (k) { return ZONES[k] === deviceZone; });
+  $("zone").value = zoneKey || "0";
+
+  // ---- Counters: suggest last + 1 ----
+  function suggestCounters() {
+    var last = load("last", { log: 0, entries: {} });
+    $("log").value = last.log + 1;
+    $("entry").value = (last.entries[$("orbit").value] || 0) + 1;
+    $("counterNote").textContent = last.log
+      ? "Suggested from your last copied packet (log " + last.log + "). Edit if needed."
+      : "First packet in this browser. Set the numbers, or paste your last packet below and press Continue.";
+  }
+  $("orbit").addEventListener("change", function () {
+    var last = load("last", { log: 0, entries: {} });
+    $("entry").value = (last.entries[$("orbit").value] || 0) + 1;
+    update();
+  });
+
+  // ---- Time ----
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function zoneParts(ms, zone) {
+    var parts = {};
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit",
+      day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(new Date(ms)).forEach(function (p) { parts[p.type] = p.value; });
+    return parts;
+  }
+  // "2026-10-20T15:50" as wall-clock time in a zone -> UTC milliseconds
+  function zonedToUtc(wall, zone) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(wall);
+    if (!m) return NaN;
+    var guess = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
+    for (var i = 0; i < 2; i++) {
+      var p = zoneParts(guess, zone);
+      var asIf = Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute);
+      guess -= asIf - Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
+    }
+    return guess;
+  }
+  function utcToWall(ms, zone) {
+    var p = zoneParts(ms, zone);
+    return p.year + "-" + p.month + "-" + p.day + "T" + p.hour + ":" + p.minute;
+  }
+  function setNow() { $("when").value = utcToWall(Math.floor(Date.now() / 60000) * 60000, ZONES[$("zone").value]); }
+
+  document.querySelectorAll("[data-time]").forEach(function (b) {
+    b.addEventListener("click", function () { setTimeMode(b.dataset.time); });
+  });
+  function setTimeMode(mode) {
+    state.time = mode;
+    document.querySelectorAll("[data-time]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.time === mode)); });
+    $("when").readOnly = mode === "now";
+    if (mode === "now") setNow();
+    update();
+  }
+  $("zone").addEventListener("change", function () { if (state.time === "now") setNow(); update(); });
+  setInterval(function () { if (state.time === "now") { setNow(); update(); } }, 30000);
+
+  // ---- Location ----
+  function round2(x) { return Math.round(x * 100) / 100; }
+  function setLocMode(mode) {
+    state.loc = mode;
+    document.querySelectorAll("[data-loc]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.loc === mode)); });
+    document.querySelectorAll("[data-show]").forEach(function (el) { el.hidden = el.dataset.show !== mode; });
+    $("lat").readOnly = $("lon").readOnly = mode !== "custom";
+    if (mode === "current") locate();
+    if (mode === "saved") pickSaved();
+    update();
+  }
+  document.querySelectorAll("[data-loc]").forEach(function (b) {
+    b.addEventListener("click", function () { setLocMode(b.dataset.loc); });
+  });
+
+  function locate() {
+    if (!navigator.geolocation) { $("locNote").textContent = "This browser can't share its location. Type coordinates instead."; return; }
+    $("locNote").textContent = "Asking the device for its location…";
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      $("lat").value = round2(pos.coords.latitude).toFixed(2);
+      $("lon").value = round2(pos.coords.longitude).toFixed(2);
+      $("locNote").textContent = "Current location (±" + Math.round(pos.coords.accuracy) + " m), rounded to about 1 km.";
+      update();
+    }, function (err) {
+      $("locNote").textContent = "Location not available (" + err.message + "). Type coordinates or pick a saved place.";
+    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+  }
+  $("locate").addEventListener("click", locate);
+
+  function places() { return load("places", []); }
+  function refreshSaved() {
+    var sel = $("saved"), list = places();
+    sel.innerHTML = "";
+    if (!list.length) sel.add(new Option("No saved places yet", ""));
+    list.forEach(function (p, i) { sel.add(new Option(p.name + "  (" + p.lat.toFixed(2) + ", " + p.lon.toFixed(2) + ")", i)); });
+  }
+  function pickSaved() {
+    var p = places()[$("saved").value];
+    if (!p) return;
+    $("lat").value = p.lat.toFixed(2);
+    $("lon").value = p.lon.toFixed(2);
+    $("place").value = p.name;
+    update();
+  }
+  $("saved").addEventListener("change", pickSaved);
+  $("savePlace").addEventListener("click", function () {
+    var lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
+    var name = $("place").value.trim();
+    if (!isFinite(lat) || !isFinite(lon) || !name) { $("locNote").textContent = "Fill in coordinates and a place name first."; return; }
+    var list = places().filter(function (p) { return p.name !== name; });
+    list.push({ name: name, lat: round2(lat), lon: round2(lon) });
+    save("places", list);
+    refreshSaved();
+    $("locNote").textContent = "Saved “" + name + "” in this browser.";
+  });
+  $("forgetPlace").addEventListener("click", function () {
+    var list = places(), i = +$("saved").value;
+    if (!list[i]) return;
+    list.splice(i, 1);
+    save("places", list);
+    refreshSaved();
+  });
+
+  // ---- Encode ----
+  function crc16(bytes) {
+    var crc = 0xFFFF;
+    for (var i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i] << 8;
+      for (var j = 0; j < 8; j++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+    return crc;
+  }
+  function toHex(bytes) { return Array.from(bytes, function (b) { return b.toString(16).toUpperCase().padStart(2, "0"); }).join(""); }
+
+  function encode() {
+    var errors = [];
+    var log = +$("log").value, entry = +$("entry").value;
+    if (!(log >= 1 && log <= 65535)) errors.push("Universal log must be 1–65535.");
+    if (!(entry >= 1 && entry <= 65535)) errors.push("Orbit entry must be 1–65535.");
+    var utc = zonedToUtc($("when").value, ZONES[$("zone").value]);
+    var met = Math.floor((utc - EPOCH) / 1000);
+    if (!isFinite(met) || met < 0 || met > 0xFFFFFFFF) errors.push("Pick a valid date and time.");
+    var lat = round2(parseFloat($("lat").value)), lon = round2(parseFloat($("lon").value));
+    if (!$("lat").value || !$("lon").value) errors.push("Set a location: current, typed or saved.");
+    else {
+      if (!(Math.abs(lat) <= 90)) errors.push("Latitude must be between -90 and 90.");
+      if (!(Math.abs(lon) <= 180)) errors.push("Longitude must be between -180 and 180.");
+    }
+
+    var texts = [];
+    Object.keys(TEXT).forEach(function (name) {
+      var b = utf8.encode($(name).value.trim());
+      var n = document.querySelector('[data-count="' + name + '"]');
+      n.textContent = b.length + "/255 bytes";
+      n.classList.toggle("over", b.length > 255);
+      if (b.length > 255) errors.push(name[0].toUpperCase() + name.slice(1) + " is too long.");
+      if (b.length) texts.push([TEXT[name], b]);
+    });
+    if (errors.length) return { errors: errors };
+
+    var size = 20 + texts.reduce(function (s, t) { return s + 2 + t[1].length; }, 0) + 2;
+    var buf = new Uint8Array(size), v = new DataView(buf.buffer);
+    buf.set(utf8.encode($("callsign").value.padEnd(4).slice(0, 4)), 0);
+    v.setUint8(4, 1);
+    v.setUint16(5, log);
+    v.setUint8(7, +$("orbit").value);
+    v.setUint16(8, entry);
+    v.setUint32(10, met);
+    v.setInt16(14, Math.round(lat * 100));
+    v.setInt16(16, Math.round(lon * 100));
+    v.setUint8(18, +$("zone").value);
+    v.setUint8(19, 0);
+    var o = 20;
+    texts.sort(function (a, b) { return a[0] - b[0]; }).forEach(function (t) {
+      buf[o] = t[0]; buf[o + 1] = t[1].length; buf.set(t[1], o + 2); o += 2 + t[1].length;
+    });
+    v.setUint16(o, crc16(buf.subarray(0, o)));
+    return { bytes: buf, hex: toHex(buf), met: met, log: log, entry: entry };
+  }
+
+  function iframeCode(hex) {
+    return '<iframe src="' + SITE + 'orbit-downlink.html?p=' + hex + '" allow="clipboard-write" style="width:100%;height:430px;border:0"></iframe>';
+  }
+
+  var current = null, previewTimer = null;
+  function update() {
+    var r = encode();
+    current = r.errors ? null : r;
+    $("errors").textContent = r.errors ? r.errors.join(" ") : "";
+    $("copyIframe").disabled = $("copyHex").disabled = !current;
+    if (!current) { $("hex").textContent = "—"; $("meta").textContent = ""; return; }
+    $("hex").textContent = r.hex.match(/../g).join(" ");
+    var crc = r.hex.slice(-4);
+    $("meta").innerHTML = "";
+    [r.bytes.length + " bytes", "CRC " + crc, "MET day " + Math.floor(r.met / 86400),
+     new Date(EPOCH + r.met * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC"].forEach(function (t) {
+      var s = document.createElement("span"); s.textContent = t; $("meta").appendChild(s);
+    });
+    $("timeNote").textContent = state.time === "now" ? "Using the current time (updates every 30 s)." : "Using the time you picked.";
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(function () { $("preview").src = "orbit-downlink.html?p=" + r.hex; }, 350);
+  }
+  ["log", "entry", "when", "lat", "lon", "place", "status", "objective", "weather"].forEach(function (id) {
+    $(id).addEventListener("input", update);
+  });
+
+  // ---- Copy ----
+  function copy(text, label) {
+    var done = function () {
+      $("copied").textContent = label + " copied.";
+      var last = load("last", { log: 0, entries: {} });
+      last.log = Math.max(last.log, current.log);
+      last.entries[$("orbit").value] = Math.max(last.entries[$("orbit").value] || 0, current.entry);
+      save("last", last);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { $("copied").textContent = "Copy failed. Select the packet text instead."; });
+  }
+  $("copyIframe").addEventListener("click", function () { if (current) copy(iframeCode(current.hex), "Iframe"); });
+  $("copyHex").addEventListener("click", function () { if (current) copy(current.hex, "Packet"); });
+
+  // ---- Load an existing packet ----
+  function decodeLoaded() {
+    var raw = $("loadHex").value, m = /[?&]p=([0-9a-fA-F]+)/.exec(raw);
+    var hex = (m ? m[1] : raw).replace(/[^0-9a-f]/gi, "");
+    if (!hex || hex.length % 2) return null;
+    var b = new Uint8Array(hex.match(/../g).map(function (h) { return parseInt(h, 16); }));
+    if (b.length < 22 || crc16(b) !== 0 || b[4] !== 1) return null;
+    var v = new DataView(b.buffer), p = {
+      log: v.getUint16(5), orbit: v.getUint8(7), entry: v.getUint16(8), met: v.getUint32(10),
+      lat: v.getInt16(14) / 100, lon: v.getInt16(16) / 100, zone: v.getUint8(18), text: {}
+    };
+    var dec = new TextDecoder(), names = {};
+    Object.keys(TEXT).forEach(function (k) { names[TEXT[k]] = k; });
+    for (var i = 20; i < b.length - 2;) {
+      var len = b[i + 1];
+      if (names[b[i]]) p.text[names[b[i]]] = dec.decode(b.slice(i + 2, i + 2 + len));
+      i += 2 + len;
+    }
+    return p;
+  }
+  $("editPacket").addEventListener("click", function () {
+    var p = decodeLoaded();
+    if (!p) { $("loadNote").textContent = "That isn't a valid OLP-1 packet (check it was copied in full)."; return; }
+    $("log").value = p.log; $("orbit").value = p.orbit; $("entry").value = p.entry;
+    $("zone").value = ZONES[p.zone] ? p.zone : 0;
+    setTimeMode("custom");
+    $("when").value = utcToWall(EPOCH + p.met * 1000, ZONES[$("zone").value]);
+    setLocMode("custom");
+    $("lat").value = p.lat.toFixed(2); $("lon").value = p.lon.toFixed(2);
+    Object.keys(TEXT).forEach(function (k) { $(k).value = p.text[k] || ""; });
+    $("loadNote").textContent = "Loaded log " + p.log + " for editing.";
+    update();
+  });
+  $("continuePacket").addEventListener("click", function () {
+    var p = decodeLoaded();
+    if (!p) { $("loadNote").textContent = "That isn't a valid OLP-1 packet (check it was copied in full)."; return; }
+    var last = load("last", { log: 0, entries: {} });
+    last.log = Math.max(last.log, p.log);
+    last.entries[p.orbit] = Math.max(last.entries[p.orbit] || 0, p.entry);
+    save("last", last);
+    suggestCounters();
+    $("loadNote").textContent = "Next numbers set: log " + (last.log + 1) + ", " + ORBITS[$("orbit").value] + " entry " + $("entry").value + ".";
+    update();
+  });
+
+  // ---- Start ----
+  refreshSaved();
+  suggestCounters();
+  setTimeMode("now");
+  setLocMode("current");
+</script>
+</body>
+</html>
