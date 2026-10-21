@@ -37,8 +37,8 @@ Each field is `type (1 byte) · length (1 byte) · UTF-8 text (length bytes)`, m
 
 | Type | Field | Notes |
 |---|---|---|
-| `0x10` | Place | e.g. "Dublin, Ireland" |
-| `0x11` | Weather | Overrides the live weather lookup |
+| `0x10` | Place | City and country, filled by the encoder from the coordinates (BigDataCloud), e.g. "Dublin, Ireland" |
+| `0x11` | Weather | Condition and temperature at that hour, filled by the encoder (Open-Meteo), e.g. "Clear · 15°C" |
 | `0x12` | Status | |
 | `0x13` | Objective | |
 
@@ -100,6 +100,8 @@ Latitude `0x1FD4C5B4` = 534,037,940 → 53.4037940; longitude `0xFC460C70` = −
 
 ## What the card adds (not stored)
 
+The card makes no outside requests: place and weather are looked up once by the encoder and stored in the packet.
+
+
 - **Local time and date**: from the time and zone.
-- **Weather**: fetched live from Open-Meteo for the place and hour, unless field `0x11` is set.
 - **Map link**: the coordinates open `blogs/map.html` at that place and moment.
