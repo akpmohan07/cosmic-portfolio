@@ -1,5 +1,5 @@
 // The blog's orbits (series), shared by the pages in blogs/.
-// The code is stored in OLP-1 packets, so never reuse or renumber one.
+// The code is stored in log packets, so never reuse or renumber one.
 // To rename an orbit, change its name here only.
 var ORBIT_LIST = [
   { code: 1, name: "Terraform",    emoji: "🌱" },  // growing things

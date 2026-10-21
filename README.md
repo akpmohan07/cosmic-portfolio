@@ -8,12 +8,12 @@ Served at [mohanverse.dev](https://mohanverse.dev) via GitHub Pages. Plain HTML,
 ```
 index.html            mohanverse.dev — the site's front page (currently a "coming soon" screen)
 blogs/                pages embedded in, or linked from, posts on blogs.mohanverse.dev
-  downlink.html       log card rendered from an OLP-1 packet (?p=<hex>)
+  downlink.html       log card rendered from a log packet (?p=<hex>)
   encode.html         builds packets and the iframe code for a post
   map.html            globe that flies to a log's place and moment
   shared/orbits.js    the orbit list: code, name, emoji
-  shared/olp.js       OLP-1 encode / decode / CRC
-docs/olp-1.md         the packet format
+  shared/olp.js       packet encode / decode / CRC
+docs/olp.md           the packet format
 ```
 
 ## Adding a log to a post
