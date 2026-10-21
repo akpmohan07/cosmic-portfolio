@@ -1,0 +1,37 @@
+orbit-downlink.html
+  s_d158d46af090ca::t_5d542032230908 99
+  s_d158d46af090ca::t_afd997210c7d9d 72,238-246
+  s_d158d46af090ca::t_4ba4fb49847a05 273-276
+  s_d158d46af090ca::t_3bf7c845d94b44 1-15,17-27,31-35,39-43,45-52,54-59,62-67,70,86-98,100-128,132-178,180-237,247-249,262-266,304-316
+  s_d158d46af090ca::t_af02eefe91cbdd 267
+  s_d158d46af090ca::t_cb0306fc9365ba 36-38
+  s_d158d46af090ca::t_c9421e3b6f86a5 73-85,268-272,277-303
+  s_d158d46af090ca::t_49c21cb38bc69a 129-130
+  s_d158d46af090ca::t_444498f693f38a 16,28-30,44,53,131,179
+  s_d158d46af090ca::t_cc12a51568d8d7 68-69,250-261
+  s_d158d46af090ca::t_5238420cfeecec 60-61
+  s_d158d46af090ca::t_2aca5b76363631 71
+orbit-encode.html
+  s_d158d46af090ca::t_6c37046d60f35a 345-349
+  s_d158d46af090ca::t_248384d2da7021 1-37,39-73,75-181,185-199,201-344,350-382,384-474
+  s_d158d46af090ca::t_4ba4fb49847a05 74,383
+  s_d158d46af090ca::t_49c21cb38bc69a 182-183
+  s_d158d46af090ca::t_2626ef121797cb 38
+  s_d158d46af090ca::t_444498f693f38a 184,200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e0672e0ae04daaede4d6af7dd820e700d1a6b2ea",
+  "prompts": {},
+  "sessions": {
+    "s_d158d46af090ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21b47ffe-7fe9-4a41-b2aa-309430afb90f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mohankumar Muthusamy <akpmohan07@gmail.com>"
+    }
+  }
+}
