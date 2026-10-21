@@ -1,0 +1,23 @@
+orbit-terminal.html
+  s_d158d46af090ca::t_49c21cb38bc69a 176,178-180
+  s_d158d46af090ca::t_8119ffb1b386ec 113,175,177,203-224
+orbit-log.html
+  s_d158d46af090ca::t_8119ffb1b386ec 126-127,172-173,175,205-226
+  s_d158d46af090ca::t_49c21cb38bc69a 174,176-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6573a0287ae7fdc013158b559f0ebf95d9b834e4",
+  "prompts": {},
+  "sessions": {
+    "s_d158d46af090ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21b47ffe-7fe9-4a41-b2aa-309430afb90f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mohankumar Muthusamy <akpmohan07@gmail.com>"
+    }
+  }
+}
