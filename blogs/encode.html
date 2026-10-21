@@ -176,15 +176,12 @@
   </fieldset>
 </div>
 
+<script src="shared/orbits.js"></script>
+<script src="shared/olp.js"></script>
 <script>
-  // OLP-1 encoder. Keep these tables and the layout in sync with orbit-downlink.html.
-  var EPOCH = Date.UTC(1999, 11, 28);
-  var ORBITS = { 1: "Terraform", 2: "Life Support", 3: "Rations", 4: "Expeditions",
-                 5: "Off-Duty", 6: "Engineering", 7: "Navigation" };
-  var EMOJI = { 1: "🌱", 2: "🫀", 3: "🥫", 4: "🗺️", 5: "🎶", 6: "🔧", 7: "🧭" };
-  var ZONES = { 0: "UTC", 1: "Europe/Dublin", 2: "Asia/Kolkata", 3: "Europe/London" };
-  var TEXT = { place: 0x10, weather: 0x11, status: 0x12, objective: 0x13 };
-  var SITE = "https://mohanverse.dev/";
+  // OLP-1 encoder. Packet format: docs/olp-1.md (codec in shared/olp.js, orbit list in shared/orbits.js)
+  var EPOCH = OLP.EPOCH, ZONES = OLP.ZONES, TEXT = OLP.TEXT;
+  var CARD_URL = "https://mohanverse.dev/blogs/downlink.html";
 
   var $ = function (id) { return document.getElementById(id); };
   var utf8 = new TextEncoder();
@@ -197,7 +194,7 @@
   function save(key, value) { try { localStorage.setItem("olp." + key, JSON.stringify(value)); } catch (e) {} }
 
   // ---- Setup ----
-  Object.keys(ORBITS).forEach(function (k) { $("orbit").add(new Option(EMOJI[k] + "  " + ORBITS[k], k)); });
+  ORBIT_LIST.forEach(function (o) { $("orbit").add(new Option(o.emoji + "  " + o.name, o.code)); });
   Object.keys(ZONES).forEach(function (k) { $("zone").add(new Option(ZONES[k], k)); });
 
   var deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -323,16 +320,6 @@
   });
 
   // ---- Encode ----
-  function crc16(bytes) {
-    var crc = 0xFFFF;
-    for (var i = 0; i < bytes.length; i++) {
-      crc ^= bytes[i] << 8;
-      for (var j = 0; j < 8; j++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
-    }
-    return crc;
-  }
-  function toHex(bytes) { return Array.from(bytes, function (b) { return b.toString(16).toUpperCase().padStart(2, "0"); }).join(""); }
-
   function encode() {
     var errors = [];
     var log = +$("log").value, entry = +$("entry").value;
@@ -348,39 +335,24 @@
       if (!(Math.abs(lon) <= 180)) errors.push("Longitude must be between -180 and 180.");
     }
 
-    var texts = [];
+    var text = {};
     Object.keys(TEXT).forEach(function (name) {
-      var b = utf8.encode($(name).value.trim());
-      var n = document.querySelector('[data-count="' + name + '"]');
-      n.textContent = b.length + "/255 bytes";
-      n.classList.toggle("over", b.length > 255);
-      if (b.length > 255) errors.push(name[0].toUpperCase() + name.slice(1) + " is too long.");
-      if (b.length) texts.push([TEXT[name], b]);
+      var n = utf8.encode($(name).value.trim()).length;
+      var count = document.querySelector('[data-count="' + name + '"]');
+      count.textContent = n + "/255 bytes";
+      count.classList.toggle("over", n > 255);
+      if (n > 255) errors.push(name[0].toUpperCase() + name.slice(1) + " is too long.");
+      text[name] = $(name).value;
     });
     if (errors.length) return { errors: errors };
 
-    var size = 20 + texts.reduce(function (s, t) { return s + 2 + t[1].length; }, 0) + 2;
-    var buf = new Uint8Array(size), v = new DataView(buf.buffer);
-    buf.set(utf8.encode($("callsign").value.padEnd(4).slice(0, 4)), 0);
-    v.setUint8(4, 1);
-    v.setUint16(5, log);
-    v.setUint8(7, +$("orbit").value);
-    v.setUint16(8, entry);
-    v.setUint32(10, met);
-    v.setInt16(14, Math.round(lat * 100));
-    v.setInt16(16, Math.round(lon * 100));
-    v.setUint8(18, +$("zone").value);
-    v.setUint8(19, 0);
-    var o = 20;
-    texts.sort(function (a, b) { return a[0] - b[0]; }).forEach(function (t) {
-      buf[o] = t[0]; buf[o + 1] = t[1].length; buf.set(t[1], o + 2); o += 2 + t[1].length;
-    });
-    v.setUint16(o, crc16(buf.subarray(0, o)));
-    return { bytes: buf, hex: toHex(buf), met: met, log: log, entry: entry };
+    var buf = OLP.encode({ callsign: $("callsign").value, log: log, orbit: +$("orbit").value, entry: entry,
+                           met: met, lat: lat, lon: lon, zone: +$("zone").value, text: text });
+    return { bytes: buf, hex: OLP.toHex(buf), met: met, log: log, entry: entry };
   }
 
   function iframeCode(hex) {
-    return '<iframe src="' + SITE + 'orbit-downlink.html?p=' + hex + '" allow="clipboard-write" style="width:100%;height:430px;border:0"></iframe>';
+    return '<iframe src="' + CARD_URL + '?p=' + hex + '" allow="clipboard-write" style="width:100%;height:430px;border:0"></iframe>';
   }
 
   var current = null, previewTimer = null;
@@ -399,7 +371,7 @@
     });
     $("timeNote").textContent = state.time === "now" ? "Using the current time (updates every 30 s)." : "Using the time you picked.";
     clearTimeout(previewTimer);
-    previewTimer = setTimeout(function () { $("preview").src = "orbit-downlink.html?p=" + r.hex; }, 350);
+    previewTimer = setTimeout(function () { $("preview").src = "downlink.html?p=" + r.hex; }, 350);
   }
   ["log", "entry", "when", "lat", "lon", "place", "status", "objective", "weather"].forEach(function (id) {
     $(id).addEventListener("input", update);
@@ -422,22 +394,8 @@
   // ---- Load an existing packet ----
   function decodeLoaded() {
     var raw = $("loadHex").value, m = /[?&]p=([0-9a-fA-F]+)/.exec(raw);
-    var hex = (m ? m[1] : raw).replace(/[^0-9a-f]/gi, "");
-    if (!hex || hex.length % 2) return null;
-    var b = new Uint8Array(hex.match(/../g).map(function (h) { return parseInt(h, 16); }));
-    if (b.length < 22 || crc16(b) !== 0 || b[4] !== 1) return null;
-    var v = new DataView(b.buffer), p = {
-      log: v.getUint16(5), orbit: v.getUint8(7), entry: v.getUint16(8), met: v.getUint32(10),
-      lat: v.getInt16(14) / 100, lon: v.getInt16(16) / 100, zone: v.getUint8(18), text: {}
-    };
-    var dec = new TextDecoder(), names = {};
-    Object.keys(TEXT).forEach(function (k) { names[TEXT[k]] = k; });
-    for (var i = 20; i < b.length - 2;) {
-      var len = b[i + 1];
-      if (names[b[i]]) p.text[names[b[i]]] = dec.decode(b.slice(i + 2, i + 2 + len));
-      i += 2 + len;
-    }
-    return p;
+    var p = OLP.decode(OLP.fromHex(m ? m[1] : raw));
+    return p.error ? null : p;
   }
   $("editPacket").addEventListener("click", function () {
     var p = decodeLoaded();
@@ -460,7 +418,7 @@
     last.entries[p.orbit] = Math.max(last.entries[p.orbit] || 0, p.entry);
     save("last", last);
     suggestCounters();
-    $("loadNote").textContent = "Next numbers set: log " + (last.log + 1) + ", " + ORBITS[$("orbit").value] + " entry " + $("entry").value + ".";
+    $("loadNote").textContent = "Next numbers set: log " + (last.log + 1) + ", " + orbitByCode(+$("orbit").value).name + " entry " + $("entry").value + ".";
     update();
   });
 

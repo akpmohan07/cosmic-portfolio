@@ -147,6 +147,7 @@
     <div class="row"><span class="k">Objective</span><span class="v" id="objective">&mdash;</span></div>
   </div>
 
+<script src="shared/orbits.js"></script>
 <script>
   var q = new URLSearchParams(location.search);
 
@@ -167,30 +168,19 @@
     el.innerHTML = esc(raw) + (suffix || "");
   }
 
-  // Orbit presets: key -> emoji, display name, accent colour
-  var ORBITS = {
-    terraform:    { emoji: "🌱", label: "Terraform",    color: "#7ee0a8" },  // gardening
-    lifesupport:  { emoji: "🫀", label: "Life Support", color: "#ff8fa3" },  // fitness, health
-    rations:      { emoji: "🥫", label: "Rations",      color: "#ffa36b" },  // food, cooking
-    expeditions:  { emoji: "🗺️", label: "Expeditions",  color: "#5fd9c8" },  // travel
-    offduty:      { emoji: "🎶", label: "Off-Duty",     color: "#c4a1ff" },  // music
-    engineering:  { emoji: "🔧", label: "Engineering",  color: "#ffd56b" },  // tech, building, career
-    navigation:   { emoji: "🧭", label: "Navigation",   color: "#8fa8ff" }   // reflection, self-growth
-  };
 
   fill("ul", q.get("ul"), "log #");
   if (q.get("callsign")) fill("callsign", q.get("callsign"));
 
   // Orbit / Entry / Day — combined line
-  var okey = (q.get("orbit") || "").toLowerCase().replace(/[^a-z]/g, "");
-  var preset = ORBITS[okey];
+  var preset = orbitByKey(q.get("orbit"));        // from shared/orbits.js
   var entry = q.get("entry");
   var day = q.get("day");
 
   if (preset || q.get("orbit") || entry || day) {
     var parts = [];
     if (preset) {
-      parts.push('<span style="color:' + preset.color + '">' + preset.emoji + " " + preset.label + "</span>");
+      parts.push('<span style="color:' + preset.color + '">' + preset.emoji + " " + preset.name + "</span>");
     } else if (q.get("orbit")) {
       parts.push(esc(q.get("orbit")));
     }

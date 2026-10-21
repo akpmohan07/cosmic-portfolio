@@ -107,30 +107,12 @@
 <body>
   <div class="crt" id="out"></div>
 
+<script src="shared/orbits.js"></script>
+<script src="shared/olp.js"></script>
 <script>
   // Orbit Downlink: renders an Orbit Log entry from an OLP-1 packet given as hex in ?p=
-  //
-  // OLP-1 (Orbit Log Packet, version 1). Big-endian, like CCSDS telemetry.
-  //   off  size  field
-  //    0    4    callsign (ASCII, e.g. "MOMO")
-  //    4    1    version (1)
-  //    5    2    universal log number (all orbits)
-  //    7    1    orbit code (see ORBITS)
-  //    8    2    entry number within the orbit
-  //   10    4    time: seconds since the mission epoch (birth, 1999-12-28 00:00 UTC)
-  //   14    2    latitude  x 100 (signed)  -> about 1 km precision by design
-  //   16    2    longitude x 100 (signed)
-  //   18    1    time zone code (see ZONES)
-  //   19    1    flags (reserved, 0)
-  //   20    ..   text fields, each: type (1) + length (1) + UTF-8 bytes
-  //                0x10 place, 0x11 weather override, 0x12 status, 0x13 objective
-  //  end-2  2    CRC-16/CCITT-FALSE over everything before it
-  var EPOCH = Date.UTC(1999, 11, 28);
-  var ORBITS = { 1: "Terraform", 2: "Life Support", 3: "Rations", 4: "Expeditions",
-                 5: "Off-Duty", 6: "Engineering", 7: "Navigation" };
-  var EMOJI = { 1: "🌱", 2: "🫀", 3: "🥫", 4: "🗺️", 5: "🎶", 6: "🔧", 7: "🧭" };
-  var ZONES = { 0: "UTC", 1: "Europe/Dublin", 2: "Asia/Kolkata", 3: "Europe/London" };
-  var TEXT = { 0x10: "place", 0x11: "weather", 0x12: "status", 0x13: "objective" };
+  // Packet format: docs/olp-1.md (codec in shared/olp.js, orbit list in shared/orbits.js)
+  var EPOCH = OLP.EPOCH;
 
   var out = document.getElementById("out");
   var lines = [];
@@ -151,46 +133,16 @@
     return b;
   }
   function pad(n, w) { return String(n).padStart(w, "0"); }
-  function hex(bytes) { return Array.from(bytes, function (b) { return b.toString(16).toUpperCase().padStart(2, "0"); }).join(" "); }
+  function hex(bytes) { return OLP.toHex(bytes, " "); }
 
-  function crc16(bytes) {
-    var crc = 0xFFFF;
-    for (var i = 0; i < bytes.length; i++) {
-      crc ^= bytes[i] << 8;
-      for (var j = 0; j < 8; j++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
-    }
-    return crc;
-  }
-
+  // Decode, then turn codes into names for display
   function decode(hexString) {
-    var clean = (hexString || "").replace(/[^0-9a-f]/gi, "");
-    if (!clean || clean.length % 2) return { error: "NO SIGNAL" };
-    var b = new Uint8Array(clean.match(/../g).map(function (h) { return parseInt(h, 16); }));
-    if (b.length < 22) return { error: "PACKET TOO SHORT" };
-    if (crc16(b) !== 0) return { error: "CRC FAIL — PACKET CORRUPTED", bytes: b };
-
-    var v = new DataView(b.buffer);
-    if (v.getUint8(4) !== 1) return { error: "UNKNOWN PACKET VERSION " + v.getUint8(4) };
-    var p = {
-      bytes: b,
-      callsign: String.fromCharCode.apply(null, b.slice(0, 4)).trim(),
-      log: v.getUint16(5),
-      orbit: ORBITS[v.getUint8(7)] || "ORBIT " + v.getUint8(7),
-      emoji: EMOJI[v.getUint8(7)] || "",
-      entry: v.getUint16(8),
-      met: v.getUint32(10),
-      lat: v.getInt16(14) / 100,
-      lon: v.getInt16(16) / 100,
-      zone: ZONES[v.getUint8(18)] || "UTC",
-      text: {}
-    };
-    var utf8 = new TextDecoder();
-    for (var i = 20; i < b.length - 2;) {
-      var type = b[i], len = b[i + 1];
-      if (i + 2 + len > b.length - 2) return { error: "MALFORMED TEXT FIELD", bytes: b };
-      if (TEXT[type]) p.text[TEXT[type]] = utf8.decode(b.slice(i + 2, i + 2 + len));
-      i += 2 + len;
-    }
+    var p = OLP.decode(OLP.fromHex(hexString));
+    if (p.error) return p;
+    var o = orbitByCode(p.orbit);
+    p.orbitName = o ? o.name : "ORBIT " + p.orbit;
+    p.emoji = o ? o.emoji : "";
+    p.zoneName = OLP.ZONES[p.zone] || "UTC";
     return p;
   }
 
@@ -227,7 +179,7 @@
 
     var t = new Date(EPOCH + p.met * 1000);
     var fmt = function (opts) {
-      return new Intl.DateTimeFormat("en-IE", Object.assign({ timeZone: p.zone }, opts)).format(t);
+      return new Intl.DateTimeFormat("en-IE", Object.assign({ timeZone: p.zoneName }, opts)).format(t);
     };
     var time = fmt({ hour: "2-digit", minute: "2-digit", hour12: false });
     var zone = fmt({ timeZoneName: "short" }).split(" ").pop();
@@ -243,17 +195,17 @@
       emo.textContent = p.emoji;
       head.append(emo, " ");
     }
-    head.append(p.orbit + "  //  SEQ " + pad(p.entry, 3) + "  //  RX " + time + " " + zone);
+    head.append(p.orbitName + "  //  SEQ " + pad(p.entry, 3) + "  //  RX " + time + " " + zone);
     text("f hex", hex(p.bytes.slice(0, 20)) + "  +" + (p.bytes.length - 22) + " B  ·  CRC " +
       hex(p.bytes.slice(-2)).replace(" ", "") + " OK");
     line("gap");
     // FROM: the coordinates open the orbit map at this spot and moment
     var from = row("From", p.callsign + " @ ");
     var map = document.createElement("a");
-    map.href = "orbit-map.html?" + new URLSearchParams({
+    map.href = "map.html?" + new URLSearchParams({
       lat: p.lat.toFixed(2), lon: p.lon.toFixed(2),
-      t: t.toISOString().slice(0, 16) + "Z", tz: p.zone,
-      place: p.text.place || "", label: p.orbit + " · Entry " + pad(p.entry, 3)
+      t: t.toISOString().slice(0, 16) + "Z", tz: p.zoneName,
+      place: p.text.place || "", label: p.orbitName + " · Entry " + pad(p.entry, 3)
     });
     map.target = "_blank";
     map.rel = "noopener";

@@ -148,6 +148,7 @@
     </div>
   </div>
 
+<script src="shared/orbits.js"></script>
 <script>
   var q = new URLSearchParams(location.search);
 
@@ -170,27 +171,17 @@
     el.innerHTML = esc(raw) + (suffix || "");
   }
 
-  var ORBITS = {
-    terraform:   { emoji: "🌱", label: "Terraform" },
-    lifesupport: { emoji: "🫀", label: "Life Support" },
-    rations:     { emoji: "🥫", label: "Rations" },
-    expeditions: { emoji: "🗺️", label: "Expeditions" },
-    offduty:     { emoji: "🎶", label: "Off-Duty" },
-    engineering: { emoji: "🔧", label: "Engineering" },
-    navigation:  { emoji: "🧭", label: "Navigation" }
-  };
 
   fill("ul", q.get("ul"), "log #");
   if (q.get("callsign")) fill("callsign", q.get("callsign"));
 
-  var okey = (q.get("orbit") || "").toLowerCase().replace(/[^a-z]/g, "");
-  var preset = ORBITS[okey];
+  var preset = orbitByKey(q.get("orbit"));        // from shared/orbits.js
   var entry = q.get("entry");
   var day = q.get("day");
 
   if (preset || q.get("orbit") || entry || day) {
     var parts = [];
-    if (preset) parts.push(preset.emoji + " " + preset.label);
+    if (preset) parts.push(preset.emoji + " " + preset.name);
     else if (q.get("orbit")) parts.push(esc(q.get("orbit")));
     if (entry) parts.push("Entry " + esc(entry));
     if (day) parts.push("Orbit Day " + esc(day));
