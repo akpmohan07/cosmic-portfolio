@@ -147,28 +147,6 @@
     return p;
   }
 
-  // Real conditions at the spot and hour, from Open-Meteo (WMO weather codes)
-  var WMO = { 0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "freezing fog",
-    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 56: "freezing drizzle", 57: "freezing drizzle",
-    61: "light rain", 63: "rain", 65: "heavy rain", 66: "freezing rain", 67: "freezing rain",
-    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains", 80: "rain showers", 81: "rain showers",
-    82: "heavy showers", 85: "snow showers", 86: "snow showers", 95: "thunderstorm", 96: "thunderstorm, hail", 99: "thunderstorm, hail" };
-
-  function fetchWeather(p, cell) {
-    var t = new Date(EPOCH + p.met * 1000);
-    var day = t.toISOString().slice(0, 10);
-    var recent = Date.now() - t.getTime() < 80 * 86400000;
-    var url = (recent ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive") +
-      "?latitude=" + p.lat + "&longitude=" + p.lon + "&start_date=" + day + "&end_date=" + day +
-      "&hourly=temperature_2m,weather_code,wind_speed_10m&timezone=GMT";
-    fetch(url).then(function (r) { return r.json(); }).then(function (d) {
-      var h = d.hourly, i = h && h.time ? h.time.indexOf(day + "T" + pad(t.getUTCHours(), 2) + ":00") : -1;
-      if (i < 0 || h.temperature_2m[i] == null) throw new Error("no data");
-      cell.textContent = Math.round(h.temperature_2m[i]) + "°C · " + (WMO[h.weather_code[i]] || "code " + h.weather_code[i]) +
-        " · wind " + Math.round(h.wind_speed_10m[i]) + " km/h";
-    }).catch(function () { cell.parentNode.remove(); });
-  }
-
   function render(p) {
     if (p.error) {
       text("d", ">> DOWNLINK");
@@ -212,17 +190,14 @@
     map.textContent = ll + " ↗";
     from.append(map, p.text.place ? " · " + p.text.place : "");
 
-    // MET and weather share a row; the WX part disappears if the lookup fails
+    // MET and weather share a row
     var met = row("MET", "Day " + Math.floor(p.met / 86400));
-    var wxPart = document.createElement("span");
-    var wxKey = document.createElement("span");
-    wxKey.className = "wxk";
-    wxKey.textContent = "  ·  WX ";
-    var wx = document.createElement("span");
-    wx.textContent = p.text.weather || "…";
-    wxPart.append(wxKey, wx);
-    met.appendChild(wxPart);
-    if (!p.text.weather) fetchWeather(p, wx);
+    if (p.text.weather) {                                                    // weather as recorded when the packet was made
+      var wxKey = document.createElement("span");
+      wxKey.className = "wxk";
+      wxKey.textContent = "  ·  WX ";
+      met.append(wxKey, p.text.weather);
+    }
 
     if (p.text.status) row("Stat", p.text.status);
     if (p.text.objective) row("Obj", p.text.objective);

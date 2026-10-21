@@ -128,13 +128,16 @@
       <div><label for="lat">Latitude</label><input id="lat" type="number" step="any" min="-90" max="90" placeholder="53.403794"></div>
       <div><label for="lon">Longitude</label><input id="lon" type="number" step="any" min="-180" max="180" placeholder="-6.251816"></div>
       <div data-show="saved" hidden><label for="saved">Saved place</label><select id="saved"></select></div>
-      <div class="full"><label for="place">Place name <span class="n" data-count="place"></span></label><input id="place" placeholder="Dublin, Ireland"></div>
+      <div class="full"><label for="place">Place <span class="n" data-count="place"></span></label><input id="place" placeholder="Filled automatically, e.g. Dublin, Ireland"></div>
+      <div class="full"><label for="weather">Weather at the time <span class="n" data-count="weather"></span></label><input id="weather" placeholder="Filled automatically, e.g. Clear · 15°C"></div>
     </div>
     <div class="row">
       <button type="button" class="btn" id="locate" data-show="current">Get current location</button>
       <button type="button" class="btn" id="savePlace">Save as a place</button>
       <button type="button" class="btn" id="forgetPlace" data-show="saved" hidden>Forget this place</button>
+      <button type="button" class="btn" id="relookup">Look up place &amp; weather again</button>
     </div>
+    <p class="note" id="envNote">Place and weather are looked up once for this spot and time, and stored in the packet. Edit them if they're off.</p>
     <p class="note" id="locNote">Exact coordinates go into the packet and appear on the public card and map.</p>
   </fieldset>
 
@@ -143,7 +146,6 @@
     <div class="grid two">
       <div class="full"><label for="status">Status <span class="n" data-count="status"></span></label><input id="status" placeholder="Signal acquired: 79 channels, zero algorithm"></div>
       <div class="full"><label for="objective">Objective <span class="n" data-count="objective"></span></label><textarea id="objective" placeholder="Rebuild my YouTube: 788 subscriptions → a 79-channel feed"></textarea></div>
-      <div class="full"><label for="weather">Weather override (optional) <span class="n" data-count="weather"></span></label><input id="weather" placeholder="Leave empty to fetch the real weather automatically"></div>
     </div>
   </fieldset>
 
@@ -299,6 +301,7 @@
     $("lat").value = fmtCoord(p.lat);
     $("lon").value = fmtCoord(p.lon);
     $("place").value = p.name;
+    manual.place = true;
     update();
   }
   $("saved").addEventListener("change", pickSaved);
@@ -319,6 +322,88 @@
     save("places", list);
     refreshSaved();
   });
+
+  // ---- Place and weather: looked up once for the chosen spot and time, then stored as text ----
+  // City/country from BigDataCloud, condition + temperature from Open-Meteo.
+  // Anything the user types into these boxes is kept and not overwritten.
+  var WMO = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Freezing fog",
+    51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle",
+    61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain",
+    71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Rain showers", 81: "Rain showers",
+    82: "Heavy showers", 85: "Snow showers", 86: "Snow showers", 95: "Thunderstorm", 96: "Thunderstorm, hail", 99: "Thunderstorm, hail" };
+  var manual = { place: false, weather: false };
+  var lookedUp = { place: "", weather: "" };
+  var lookupTimer = null;
+
+  ["place", "weather"].forEach(function (id) {
+    $(id).addEventListener("input", function () { manual[id] = $(id).value.trim() !== ""; });
+  });
+  $("relookup").addEventListener("click", function () {
+    manual.place = manual.weather = false;
+    lookedUp.place = lookedUp.weather = "";
+    $("place").value = $("weather").value = "";
+    lookup();
+  });
+
+  function scheduleLookup() { clearTimeout(lookupTimer); lookupTimer = setTimeout(lookup, 700); }
+
+  function lookup() {
+    var lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
+    if (!$("lat").value || !$("lon").value || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return;
+    var spot = lat.toFixed(3) + "," + lon.toFixed(3);
+    if (!manual.place && spot !== lookedUp.place) { lookedUp.place = spot; lookupPlace(lat, lon); }
+    var utc = zonedToUtc($("when").value, ZONES[$("zone").value]);
+    if (!isFinite(utc)) return;
+    var hour = new Date(Math.floor(utc / 3600000) * 3600000).toISOString().slice(0, 13);   // "2026-10-20T14"
+    if (!manual.weather && spot + "@" + hour !== lookedUp.weather) { lookedUp.weather = spot + "@" + hour; lookupWeather(lat, lon, hour); }
+  }
+
+  function envNote(text) { $("envNote").textContent = text; }
+
+  // City + country from BigDataCloud's free client-side reverse geocoder.
+  // Its "city" is the city people would name (London, not Westminster; New York City, not Brooklyn).
+  // When that comes back as a county (e.g. "Fingal County" for north Dublin), use the next level up ("Dublin").
+  var countryNames = (window.Intl && Intl.DisplayNames) ? new Intl.DisplayNames(["en"], { type: "region" }) : null;
+  function lookupPlace(lat, lon) {
+    envNote("Looking up the city…");
+    fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en&latitude=" + lat + "&longitude=" + lon)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var city = d.city || d.locality || "";
+        if (/\bcounty\b/i.test(city)) {
+          var admin = (d.localityInfo && d.localityInfo.administrative) || [];
+          var self = admin.find(function (a) { return a.name === city; });
+          var up = self && admin.find(function (a) { return a.adminLevel === self.adminLevel - 1; });
+          if (up) city = up.name;
+        }
+        var country = (countryNames && d.countryCode && countryNames.of(d.countryCode)) || d.countryName;
+        if (!country) throw new Error("no country");
+        if (!manual.place) { $("place").value = [city, country].filter(Boolean).join(", "); update(); }
+        envNote("City from BigDataCloud. Edit it if it's off.");
+      })
+      .catch(function () { lookedUp.place = ""; envNote("Couldn't look up the city. Type it in."); });
+  }
+
+  function lookupWeather(lat, lon, hour, retried) {
+    var day = hour.slice(0, 10);
+    var recent = Math.abs(Date.now() - Date.parse(day)) < 80 * 86400000;     // older hours come from the archive
+    var url = (recent ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive") +
+      "?latitude=" + lat + "&longitude=" + lon + "&start_date=" + day + "&end_date=" + day +
+      "&hourly=temperature_2m,weather_code&timezone=GMT";
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var h = d.hourly, i = h && h.time ? h.time.indexOf(hour + ":00") : -1;
+        if (i < 0 || h.temperature_2m[i] == null) throw new Error("no data");
+        var text = (WMO[h.weather_code[i]] || "Code " + h.weather_code[i]) + " · " + Math.round(h.temperature_2m[i]) + "°C";
+        if (!manual.weather) { $("weather").value = text; update(); }
+      })
+      .catch(function () {
+        if (!retried) { setTimeout(function () { lookupWeather(lat, lon, hour, true); }, 1500); return; }   // one retry for a flaky network
+        lookedUp.weather = "";
+        envNote("Couldn't look up the weather for that time. Type it in, or leave it empty.");
+      });
+  }
 
   // ---- Encode ----
   function encode() {
@@ -358,6 +443,7 @@
 
   var current = null, previewTimer = null;
   function update() {
+    scheduleLookup();
     var r = encode();
     current = r.errors ? null : r;
     $("errors").textContent = r.errors ? r.errors.join(" ") : "";
@@ -408,6 +494,8 @@
     setLocMode("custom");
     $("lat").value = fmtCoord(p.lat); $("lon").value = fmtCoord(p.lon);
     Object.keys(TEXT).forEach(function (k) { $(k).value = p.text[k] || ""; });
+    manual.place = !!p.text.place;
+    manual.weather = !!p.text.weather;
     $("loadNote").textContent = "Loaded log " + p.log + " for editing.";
     update();
   });
