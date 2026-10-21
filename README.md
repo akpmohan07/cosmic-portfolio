@@ -16,7 +16,6 @@ blogs/                pages embedded in, or linked from, posts on blogs.mohanver
   shared/orbits.js    the orbit list: code, name, emoji, colour
   shared/olp.js       OLP-1 encode / decode / CRC
 docs/olp-1.md         the packet format
-orbit-*.html          redirects from the old root paths
 ```
 
 ## Adding a log to a post
