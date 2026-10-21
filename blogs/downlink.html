@@ -111,8 +111,8 @@
 <script src="shared/orbits.js"></script>
 <script src="shared/olp.js"></script>
 <script>
-  // Orbit Downlink: renders an Orbit Log entry from an OLP-1 packet given as hex in ?p=
-  // Packet format: docs/olp-1.md (codec in shared/olp.js, orbit list in shared/orbits.js)
+  // Orbit Downlink: renders an Orbit Log entry from a log packet given as hex in ?p=
+  // Packet format: docs/olp.md (codec in shared/olp.js, orbit list in shared/orbits.js)
   var EPOCH = OLP.EPOCH;
 
   var out = document.getElementById("out");
@@ -185,8 +185,8 @@
     var time = fmt({ hour: "2-digit", minute: "2-digit", hour12: false });
     var zone = fmt({ timeZoneName: "short" }).split(" ").pop();
     var date = fmt({ weekday: "short", day: "numeric", month: "short", year: "numeric" });
-    var ll = Math.abs(p.lat).toFixed(2) + (p.lat >= 0 ? "N" : "S") + " " +
-             pad(Math.abs(p.lon).toFixed(2), 6) + (p.lon >= 0 ? "E" : "W");
+    var ll = Math.abs(p.lat).toFixed(5) + (p.lat >= 0 ? "N" : "S") + " " +   // 5 decimals (~1 m) on the card
+             pad(Math.abs(p.lon).toFixed(5), 9) + (p.lon >= 0 ? "E" : "W");
 
     // Header: log, orbit + entry, local time and date
     var head = line("d");
@@ -203,7 +203,7 @@
     var from = row("From", p.callsign + " @ ");
     var map = document.createElement("a");
     map.href = "map.html?" + new URLSearchParams({
-      lat: p.lat.toFixed(2), lon: p.lon.toFixed(2),
+      lat: String(p.lat), lon: String(p.lon),
       t: t.toISOString().slice(0, 16) + "Z", tz: p.zoneName,
       place: p.text.place || "", label: p.orbitName + " · Entry " + pad(p.entry, 3)
     });

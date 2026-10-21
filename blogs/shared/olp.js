@@ -1,8 +1,9 @@
-// OLP-1 (Orbit Log Packet, version 1): encode and decode. Spec: docs/olp-1.md
+// OLP (Orbit Log Packet), version 2: encode and decode. Spec: docs/olp.md
 // Shared by downlink.html (reads packets) and encode.html (builds them).
 var OLP = (function () {
-  var VERSION = 1;
-  var HEADER = 20;                                  // bytes before the text fields
+  var VERSION = 2;
+  var HEADER = 24;                                  // bytes before the text fields
+  var COORD = 1e7;                                  // lat/lon stored as int32 x 10^7 (~1 cm)
   var EPOCH = Date.UTC(1999, 11, 28);               // mission epoch: birth, 1999-12-28 00:00 UTC
   var ZONES = { 0: "UTC", 1: "Europe/Dublin", 2: "Asia/Kolkata", 3: "Europe/London" };
   var TEXT = { place: 0x10, weather: 0x11, status: 0x12, objective: 0x13 };
@@ -45,10 +46,10 @@ var OLP = (function () {
       orbit: v.getUint8(7),
       entry: v.getUint16(8),
       met: v.getUint32(10),
-      lat: v.getInt16(14) / 100,
-      lon: v.getInt16(16) / 100,
-      zone: v.getUint8(18),
-      flags: v.getUint8(19),
+      lat: v.getInt32(14) / COORD,
+      lon: v.getInt32(18) / COORD,
+      zone: v.getUint8(22),
+      flags: v.getUint8(23),
       text: {}
     };
     var utf8 = new TextDecoder();
@@ -62,7 +63,7 @@ var OLP = (function () {
   }
 
   // { callsign, log, orbit, entry, met, lat, lon, zone, text } -> bytes. Inputs are assumed validated;
-  // lat/lon are rounded to 2 decimals and text fields over 255 bytes throw.
+  // lat/lon keep up to 7 decimals; text fields over 255 bytes throw.
   function encode(f) {
     var utf8 = new TextEncoder(), texts = [];
     Object.keys(TEXT).forEach(function (name) {
@@ -78,10 +79,10 @@ var OLP = (function () {
     v.setUint8(7, f.orbit);
     v.setUint16(8, f.entry);
     v.setUint32(10, f.met);
-    v.setInt16(14, Math.round(f.lat * 100));
-    v.setInt16(16, Math.round(f.lon * 100));
-    v.setUint8(18, f.zone || 0);
-    v.setUint8(19, 0);
+    v.setInt32(14, Math.round(f.lat * COORD));
+    v.setInt32(18, Math.round(f.lon * COORD));
+    v.setUint8(22, f.zone || 0);
+    v.setUint8(23, 0);
     var o = HEADER;
     texts.forEach(function (t) { buf[o] = t[0]; buf[o + 1] = t[1].length; buf.set(t[1], o + 2); o += 2 + t[1].length; });
     v.setUint16(o, crc16(buf.subarray(0, o)));

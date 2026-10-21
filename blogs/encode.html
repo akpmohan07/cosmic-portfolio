@@ -91,7 +91,7 @@
 <body>
 <div class="wrap">
   <h1>&gt;&gt; ORBIT ENCODER</h1>
-  <p class="sub">Build an OLP-1 downlink packet for a log entry, preview it, and copy the iframe.</p>
+  <p class="sub">Build a downlink packet for a log entry, preview it, and copy the iframe.</p>
 
   <fieldset>
     <legend>Log</legend>
@@ -125,8 +125,8 @@
       <button type="button" data-loc="saved" aria-pressed="false">Saved place</button>
     </div>
     <div class="grid">
-      <div><label for="lat">Latitude</label><input id="lat" type="number" step="0.01" min="-90" max="90" placeholder="53.40"></div>
-      <div><label for="lon">Longitude</label><input id="lon" type="number" step="0.01" min="-180" max="180" placeholder="-6.25"></div>
+      <div><label for="lat">Latitude</label><input id="lat" type="number" step="any" min="-90" max="90" placeholder="53.403794"></div>
+      <div><label for="lon">Longitude</label><input id="lon" type="number" step="any" min="-180" max="180" placeholder="-6.251816"></div>
       <div data-show="saved" hidden><label for="saved">Saved place</label><select id="saved"></select></div>
       <div class="full"><label for="place">Place name <span class="n" data-count="place"></span></label><input id="place" placeholder="Dublin, Ireland"></div>
     </div>
@@ -135,7 +135,7 @@
       <button type="button" class="btn" id="savePlace">Save as a place</button>
       <button type="button" class="btn" id="forgetPlace" data-show="saved" hidden>Forget this place</button>
     </div>
-    <p class="note" id="locNote">Coordinates are rounded to 2 decimals (about 1 km) in the packet.</p>
+    <p class="note" id="locNote">Exact coordinates go into the packet and appear on the public card and map.</p>
   </fieldset>
 
   <fieldset>
@@ -179,7 +179,7 @@
 <script src="shared/orbits.js"></script>
 <script src="shared/olp.js"></script>
 <script>
-  // OLP-1 encoder. Packet format: docs/olp-1.md (codec in shared/olp.js, orbit list in shared/orbits.js)
+  // Log packet encoder. Packet format: docs/olp.md (codec in shared/olp.js, orbit list in shared/orbits.js)
   var EPOCH = OLP.EPOCH, ZONES = OLP.ZONES, TEXT = OLP.TEXT;
   var CARD_URL = "https://mohanverse.dev/blogs/downlink.html";
 
@@ -257,7 +257,8 @@
   setInterval(function () { if (state.time === "now") { setNow(); update(); } }, 30000);
 
   // ---- Location ----
-  function round2(x) { return Math.round(x * 100) / 100; }
+  function round7(x) { return Math.round(x * 1e7) / 1e7; }                 // the packet's precision (~1 cm)
+  function fmtCoord(x) { return String(round7(x)); }
   function setLocMode(mode) {
     state.loc = mode;
     document.querySelectorAll("[data-loc]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.loc === mode)); });
@@ -275,9 +276,9 @@
     if (!navigator.geolocation) { $("locNote").textContent = "This browser can't share its location. Type coordinates instead."; return; }
     $("locNote").textContent = "Asking the device for its location…";
     navigator.geolocation.getCurrentPosition(function (pos) {
-      $("lat").value = round2(pos.coords.latitude).toFixed(2);
-      $("lon").value = round2(pos.coords.longitude).toFixed(2);
-      $("locNote").textContent = "Current location (±" + Math.round(pos.coords.accuracy) + " m), rounded to about 1 km.";
+      $("lat").value = fmtCoord(pos.coords.latitude);
+      $("lon").value = fmtCoord(pos.coords.longitude);
+      $("locNote").textContent = "Current location (±" + Math.round(pos.coords.accuracy) + " m), exact location.";
       update();
     }, function (err) {
       $("locNote").textContent = "Location not available (" + err.message + "). Type coordinates or pick a saved place.";
@@ -290,13 +291,13 @@
     var sel = $("saved"), list = places();
     sel.innerHTML = "";
     if (!list.length) sel.add(new Option("No saved places yet", ""));
-    list.forEach(function (p, i) { sel.add(new Option(p.name + "  (" + p.lat.toFixed(2) + ", " + p.lon.toFixed(2) + ")", i)); });
+    list.forEach(function (p, i) { sel.add(new Option(p.name + "  (" + p.lat.toFixed(5) + ", " + p.lon.toFixed(5) + ")", i)); });
   }
   function pickSaved() {
     var p = places()[$("saved").value];
     if (!p) return;
-    $("lat").value = p.lat.toFixed(2);
-    $("lon").value = p.lon.toFixed(2);
+    $("lat").value = fmtCoord(p.lat);
+    $("lon").value = fmtCoord(p.lon);
     $("place").value = p.name;
     update();
   }
@@ -306,7 +307,7 @@
     var name = $("place").value.trim();
     if (!isFinite(lat) || !isFinite(lon) || !name) { $("locNote").textContent = "Fill in coordinates and a place name first."; return; }
     var list = places().filter(function (p) { return p.name !== name; });
-    list.push({ name: name, lat: round2(lat), lon: round2(lon) });
+    list.push({ name: name, lat: round7(lat), lon: round7(lon) });
     save("places", list);
     refreshSaved();
     $("locNote").textContent = "Saved “" + name + "” in this browser.";
@@ -328,7 +329,7 @@
     var utc = zonedToUtc($("when").value, ZONES[$("zone").value]);
     var met = Math.floor((utc - EPOCH) / 1000);
     if (!isFinite(met) || met < 0 || met > 0xFFFFFFFF) errors.push("Pick a valid date and time.");
-    var lat = round2(parseFloat($("lat").value)), lon = round2(parseFloat($("lon").value));
+    var lat = round7(parseFloat($("lat").value)), lon = round7(parseFloat($("lon").value));
     if (!$("lat").value || !$("lon").value) errors.push("Set a location: current, typed or saved.");
     else {
       if (!(Math.abs(lat) <= 90)) errors.push("Latitude must be between -90 and 90.");
@@ -399,20 +400,20 @@
   }
   $("editPacket").addEventListener("click", function () {
     var p = decodeLoaded();
-    if (!p) { $("loadNote").textContent = "That isn't a valid OLP-1 packet (check it was copied in full)."; return; }
+    if (!p) { $("loadNote").textContent = "That isn't a valid version-2 log packet (check it was copied in full)."; return; }
     $("log").value = p.log; $("orbit").value = p.orbit; $("entry").value = p.entry;
     $("zone").value = ZONES[p.zone] ? p.zone : 0;
     setTimeMode("custom");
     $("when").value = utcToWall(EPOCH + p.met * 1000, ZONES[$("zone").value]);
     setLocMode("custom");
-    $("lat").value = p.lat.toFixed(2); $("lon").value = p.lon.toFixed(2);
+    $("lat").value = fmtCoord(p.lat); $("lon").value = fmtCoord(p.lon);
     Object.keys(TEXT).forEach(function (k) { $(k).value = p.text[k] || ""; });
     $("loadNote").textContent = "Loaded log " + p.log + " for editing.";
     update();
   });
   $("continuePacket").addEventListener("click", function () {
     var p = decodeLoaded();
-    if (!p) { $("loadNote").textContent = "That isn't a valid OLP-1 packet (check it was copied in full)."; return; }
+    if (!p) { $("loadNote").textContent = "That isn't a valid version-2 log packet (check it was copied in full)."; return; }
     var last = load("last", { log: 0, entries: {} });
     last.log = Math.max(last.log, p.log);
     last.entries[p.orbit] = Math.max(last.entries[p.orbit] || 0, p.entry);
