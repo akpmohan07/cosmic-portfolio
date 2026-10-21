@@ -1,0 +1,25 @@
+README.md
+  s_d158d46af090ca::t_a25ddc71e2000f 14
+blogs/downlink.html
+  s_d158d46af090ca::t_e8732cbddb335e 28,71-72,100,191,193,200-201,214-224,226,229-231,237
+blogs/encode.html
+  s_d158d46af090ca::t_a25ddc71e2000f 74,355
+blogs/shared/orbits.js
+  s_d158d46af090ca::t_0bd3b9c9ebc636 1-2,5-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5edf8c8bcd216d38cada6e2d5f837717c22fa84b",
+  "prompts": {},
+  "sessions": {
+    "s_d158d46af090ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21b47ffe-7fe9-4a41-b2aa-309430afb90f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mohankumar Muthusamy <akpmohan07@gmail.com>"
+    }
+  }
+}
