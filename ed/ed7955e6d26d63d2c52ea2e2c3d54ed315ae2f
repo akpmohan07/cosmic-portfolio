@@ -1,0 +1,29 @@
+README.md
+  s_d158d46af090ca::t_e61d8471dda5c5 11,15-16
+blogs/shared/olp.js
+  s_d158d46af090ca::t_936b81adbb2128 1,4-6,49-52,66,82-85
+blogs/downlink.html
+  s_d158d46af090ca::t_e61d8471dda5c5 114-115,188-189,206
+docs/olp.md
+  s_d158d46af090ca::t_6994da161be1ee 1-105
+blogs/shared/orbits.js
+  s_d158d46af090ca::t_936b81adbb2128 2
+blogs/encode.html
+  s_d158d46af090ca::t_e61d8471dda5c5 94,128-129,138,182,260-261,279-281,294,299-300,310,332,403,409,416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eded7955e6d26d63d2c52ea2e2c3d54ed315ae2f",
+  "prompts": {},
+  "sessions": {
+    "s_d158d46af090ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21b47ffe-7fe9-4a41-b2aa-309430afb90f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mohankumar Muthusamy <akpmohan07@gmail.com>"
+    }
+  }
+}
